@@ -10,11 +10,14 @@
         <div class="card shadow">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h3 class="mb-0">Control de Inventario - Pinturas JAM</h3>
-                <div>
+                <!-- Aquí se encuentra el nuevo botón de Cerrar Sesión junto a las demás opciones -->
+                <div class="d-flex align-items-center gap-2">
                     <a href="/caja" class="btn btn-warning btn-sm fw-bold">💰 Cierre de Caja</a>
-                    <a href="/historial" class="btn btn-secondary btn-sm fw-bold ms-1">Historial</a>
-                    <a href="/exportar" class="btn btn-success btn-sm fw-bold ms-1">Excel</a>
-                    <a href="/agregar" class="btn btn-light btn-sm text-primary fw-bold ms-1">+ Nuevo Producto</a>
+                    <a href="/historial" class="btn btn-secondary btn-sm fw-bold">Historial</a>
+                    <a href="/exportar" class="btn btn-success btn-sm fw-bold">Excel</a>
+                    <a href="/agregar" class="btn btn-light btn-sm text-primary fw-bold">+ Nuevo Producto</a>
+                    <!-- BOTÓN DE CERRAR SESIÓN AÑADIDO -->
+                    <a href="/logout" class="btn btn-danger btn-sm fw-bold ml-2">Cerrar Sesión</a>
                 </div>
             </div>
             <div class="card-body">
