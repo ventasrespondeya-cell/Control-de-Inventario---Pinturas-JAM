@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de Compras - Pinturas JAM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>?? Historial de Compras a Proveedores</h2>
+            <div>
+                <a href="/comprar" class="btn btn-primary btn-sm fw-bold me-2">?? Registrar Nueva Compra</a>
+                <a href="/" class="btn btn-dark btn-sm fw-bold">Volver al Inventario</a>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-primary">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">?? Registro de Entradas de Mercancía</h4>
+            </div>
+            <div class="card-body p-0">
+                {% if compras %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0 align-middle text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th># Reg.</th>
+                                <th>Fecha y Hora</th>
+                                <th>Producto</th>
+                                <th>Proveedor</th>
+                                <th>Costo Unit. ($)</th>
+                                <th>Cant.</th>
+                                <th>Costo Total ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in compras %}
+                            <tr>
+                                <td>{{ c.id }}</td>
+                                <td class="small">{{ c.fecha }}</td>
+                                <td class="fw-bold">{{ c.producto_nombre }}</td>
+                                <td><span class="badge bg-secondary">{{ c.proveedor }}</span></td>
+                                <td>${{ "%.2f"|format(c.costo_unitario) }}</td>
+                                <td><span class="badge bg-info text-dark">{{ c.cantidad }}</span></td>
+                                <td class="fw-bold text-primary">${{ "%.2f"|format(c.costo_total) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info text-center m-3">
+                    <strong>No hay compras a proveedores registradas aún.</strong>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

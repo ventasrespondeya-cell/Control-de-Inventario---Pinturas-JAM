@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de Ventas - Pinturas JAM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>📚 Historial y Cierres de Caja</h2>
+            <div>
+                <a href="/limpiar_historial" class="btn btn-danger btn-sm fw-bold me-2" onclick="return confirm('¡ADVERTENCIA! ¿Estás seguro de borrar absolutamente TODO el historial de ventas? Esta acción no se puede deshacer.');">🗑️ Limpiar Todo</a>
+                <a href="/" class="btn btn-dark btn-sm fw-bold">Volver al Inventario</a>
+            </div>
+        </div>
+
+        {% if ventas_por_dia %}
+            {% for fecha, datos in ventas_por_dia.items() %}
+            <div class="card shadow-sm mb-4 border-secondary">
+               <!-- Encabezado de cada Cierre de Caja -->
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-3">
+                    <h4 class="mb-0">📅 Fecha: {{ fecha }}</h4>
+                    <div class="d-flex align-items-center">
+                        <h4 class="mb-0 fw-bold text-warning me-4">Total del Día: ${{ "%.2f"|format(datos.total_dia) }}</h4>
+                        <a href="/exportar_ventas_dia/{{ fecha }}" class="btn btn-success btn-sm fw-bold shadow-sm">
+                            📥 Descargar Excel
+                        </a>
+                    </div>
+                </div>
+                <!-- Tabla de ventas del día -->
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0 align-middle text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Recibo #</th>
+                                    <th>Hora</th>
+                                    <th>Comprador</th>
+                                    <th>Producto</th>
+                                    <th>Cant.</th>
+                                    <th>Método de Pago</th>
+                                    <th>Total ($)</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in datos.ventas %}
+                                <tr>
+                                    <td>{{ v.id }}</td>
+                                    <td class="small">{{ v.fecha.split(' ')[1] if ' ' in v.fecha else v.fecha }}</td>
+                                    <td>{{ v.comprador }}</td>
+                                    <td>{{ v.producto_nombre }}</td>
+                                    <td>{{ v.cantidad }}</td>
+                                    <td><span class="badge bg-info text-dark">{{ v.metodo_pago }}</span></td>
+                                    <td class="fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
+                                    <td>
+                                        <a href="/ticket/{{ v.id }}" target="_blank" class="btn btn-info btn-sm text-white fw-bold">🎟️ Ticket</a>
+                                        <a href="/editar_venta/{{ v.id }}" class="btn btn-warning btn-sm fw-bold">Editar</a>
+                                        <a href="/eliminar_venta/{{ v.id }}" class="btn btn-danger btn-sm fw-bold" onclick="return confirm('¿Seguro que quieres borrar este registro?');">X</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info text-center mt-4">
+                <strong>No hay ventas registradas en el historial.</strong>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
