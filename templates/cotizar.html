@@ -4,66 +4,189 @@
     <meta charset="UTF-8">
     <title>Generar Cotización - Pinturas JAM</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-light">
-    <div class="container mt-5 mb-5" style="max-width: 800px;">
-        <div class="card shadow">
-            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">?? Generar Cotización / Presupuesto</h4>
-                <a href="/" class="btn btn-outline-light btn-sm fw-bold">Volver</a>
+    <div class="container mt-4 mb-5" style="max-width: 950px;">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-dark text-white p-4 d-flex justify-content-between align-items-center">
+                <h2 class="mb-0 fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Generador de Cotizaciones</h2>
+                <a href="/" class="btn btn-outline-light fw-bold fs-5">Volver al Inicio</a>
             </div>
-            <div class="card-body">
-                <form action="/cotizar" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nombre del Cliente / Empresa:</label>
-                        <input type="text" name="cliente" class="form-control" placeholder="Ej: Constructora XYZ / Juan Pérez" required>
-                    </div>
-
-                    <h5 class="mt-4 mb-3 border-bottom pb-2">Seleccionar Productos</h5>
+            
+            <div class="card-body p-4 p-md-5">
+                <form method="POST" action="/cotizar" id="form-cotizacion">
                     
-                    <div id="productosContainer">
-                        <div class="row g-2 mb-2 producto-fila">
-                            <div class="col-md-7">
-                                <select name="producto_id[]" class="form-select" required>
-                                    <option value="">-- Seleccionar Producto --</option>
-                                    {% for p in productos %}
-                                    <option value="{{ p.id }}">{{ p.nombre }} ({{ p.color }}) - ${{ "%.2f"|format(p.precio) }}</option>
-                                    {% endfor %}
+                    <!-- Datos del Cliente y Método de Pago -->
+                    <div class="mb-5 bg-light p-4 rounded border">
+                        <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-user-tie me-2"></i> Detalles de la Cotización</h4>
+                        <div class="row">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label fw-bold fs-5">Cliente o Empresa:</label>
+                                <input type="text" name="cliente" class="form-control form-control-lg border-primary" placeholder="Ej. Constructora Los Andes..." required autofocus>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold fs-5">Método de Pago Sugerido:</label>
+                                <select name="metodo_pago" class="form-select form-select-lg border-primary fw-bold" required>
+                                    <option value="Efectivo (Bs)">💵 Efectivo (Bolívares)</option>
+                                    <option value="Divisas (USD/EUR)">💵 Divisas (Efectivo USD/EUR)</option>
+                                    <option value="Punto de Venta">💳 Punto de Venta</option>
+                                    <option value="Pago Movil">📱 Pago Móvil</option>
+                                    <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                                    <option value="Binance">🟡 Binance (USDT)</option>
                                 </select>
-                            </div>
-                            <div class="col-md-3">
-                                <input type="number" name="cantidad[]" class="form-control" placeholder="Cantidad" min="1" value="1" required>
-                            </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-danger w-100" onclick="eliminarFila(this)">?</button>
                             </div>
                         </div>
                     </div>
 
-                    <button type="button" class="btn btn-outline-primary btn-sm mb-4 fw-bold" onclick="agregarFila()">? Añadir otro producto</button>
+                    <!-- Lista de Productos Dinámica con Buscador Lupa -->
+                    <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-paint-roller me-2"></i> Productos a Cotizar</h4>
+                    <div class="table-responsive mb-3 shadow-sm">
+                        <table class="table table-bordered align-middle bg-white" id="tabla-productos">
+                            <thead class="table-dark fs-5">
+                                <tr>
+                                    <th style="width: 55%;">🔍 Buscar Producto / Color</th>
+                                    <th style="width: 20%;" class="text-center">Cantidad</th>
+                                    <th style="width: 15%;" class="text-center">Subtotal</th>
+                                    <th style="width: 10%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-items">
+                                <tr class="item-fila">
+                                    <td>
+                                        <input type="text" class="form-control form-control-lg input-busqueda-prod fw-bold" placeholder="🔍 Escribe para buscar producto..." autocomplete="off" required>
+                                        <input type="hidden" name="producto_id[]" class="input-id-prod" required>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="cantidad[]" class="form-control form-control-lg input-cantidad fw-bold text-center text-primary" min="1" value="1" required oninput="calcularTotal()">
+                                    </td>
+                                    <td class="text-center fs-5 fw-bold text-success subtotal-fila">$0.00</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-danger btn-lg shadow-sm" onclick="eliminarFila(this)" title="Quitar"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success fw-bold btn-lg">?? Generar Presupuesto Imprimible / PDF</button>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-5 gap-3">
+                        <button type="button" class="btn btn-outline-primary btn-lg fw-bold shadow-sm" onclick="agregarFila()">
+                            <i class="fas fa-plus-circle me-1"></i> Añadir otra pintura a la lista
+                        </button>
+                        
+                        <div class="text-end bg-dark text-white p-3 rounded shadow-lg border border-warning">
+                            <span class="fs-5 text-light">Total Estimado:</span><br>
+                            <span class="fs-1 fw-bold text-warning" id="total-cotizacion">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg fw-bold py-4 fs-3 shadow-lg">
+                            <i class="fas fa-print me-2"></i> Generar Documento de Cotización
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Script de búsqueda inteligente y cálculo dinámico -->
     <script>
+        const catalogoProductos = [
+            {% for p in productos %}
+            { id: "{{ p.id }}", texto: "{{ p.nombre }} - {{ p.color }} [{{ p.categoria }}] (${{ '%.2f'|format(p.precio) }})", precio: {{ p.precio }} },
+            {% endfor %}
+        ];
+
+        document.addEventListener("DOMContentLoaded", function() {
+            configurarFila(document.querySelector('.item-fila'));
+        });
+
+        function configurarFila(fila) {
+            let inputBusqueda = fila.querySelector('.input-busqueda-prod');
+            let inputId = fila.querySelector('.input-id-prod');
+            
+            let listId = 'datalist_' + Math.random().toString(36).substr(2, 9);
+            inputBusqueda.setAttribute('list', listId);
+            
+            let datalist = document.createElement('datalist');
+            datalist.id = listId;
+            
+            catalogoProductos.forEach(p => {
+                let opt = document.createElement('option');
+                opt.value = p.texto;
+                opt.setAttribute('data-id', p.id);
+                opt.setAttribute('data-precio', p.precio);
+                datalist.appendChild(opt);
+            });
+            
+            fila.appendChild(datalist);
+
+            inputBusqueda.addEventListener('input', function(e) {
+                let val = e.target.value;
+                inputId.value = '';
+                let opciones = datalist.options;
+                for(let i=0; i<opciones.length; i++) {
+                    if(opciones[i].value === val) {
+                        inputId.value = opciones[i].getAttribute('data-id');
+                        break;
+                    }
+                }
+                calcularTotal();
+            });
+        }
+
+        function calcularTotal() {
+            let filas = document.querySelectorAll('.item-fila');
+            let totalSuma = 0;
+
+            filas.forEach(fila => {
+                let inputId = fila.querySelector('.input-id-prod');
+                let cantidad = fila.querySelector('.input-cantidad').value;
+                
+                if(inputId.value) {
+                    let prodEncontrado = catalogoProductos.find(p => p.id === inputId.value);
+                    if(prodEncontrado) {
+                        let cant = parseInt(cantidad) || 0;
+                        let subtotal = prodEncontrado.precio * cant;
+                        fila.querySelector('.subtotal-fila').innerText = '$' + subtotal.toFixed(2);
+                        totalSuma += subtotal;
+                        return;
+                    }
+                }
+                fila.querySelector('.subtotal-fila').innerText = '$0.00';
+            });
+
+            document.getElementById('total-cotizacion').innerText = '$' + totalSuma.toFixed(2);
+        }
+
         function agregarFila() {
-            const container = document.getElementById('productosContainer');
-            const primeraFila = container.querySelector('.producto-fila');
-            const nuevaFila = primeraFila.cloneNode(true);
-            nuevaFila.querySelector('select').value = '';
-            nuevaFila.querySelector('input').value = '1';
-            container.appendChild(nuevaFila);
+            let tbody = document.getElementById('lista-items');
+            let filas = tbody.getElementsByClassName('item-fila');
+            let nuevaFila = filas[0].cloneNode(true);
+            
+            nuevaFila.querySelector('.input-busqueda-prod').value = '';
+            nuevaFila.querySelector('.input-id-prod').value = '';
+            nuevaFila.querySelector('.input-cantidad').value = 1;
+            nuevaFila.querySelector('.subtotal-fila').innerText = '$0.00';
+            
+            let viejoDatalist = nuevaFila.querySelector('datalist');
+            if(viejoDatalist) viejoDatalist.remove();
+
+            tbody.appendChild(nuevaFila);
+            configurarFila(nuevaFila);
+            calcularTotal();
         }
 
         function eliminarFila(btn) {
-            const filas = document.querySelectorAll('.producto-fila');
+            let tbody = document.getElementById('lista-items');
+            let filas = tbody.getElementsByClassName('item-fila');
+            
             if (filas.length > 1) {
-                btn.closest('.producto-fila').remove();
+                btn.closest('tr').remove();
+                calcularTotal();
+            } else {
+                alert("Debe haber al menos un producto en la cotización.");
             }
         }
     </script>
