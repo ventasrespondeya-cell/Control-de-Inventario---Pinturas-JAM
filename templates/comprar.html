@@ -2,43 +2,85 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Entrada de Mercancía - Pinturas JAM</title>
+    <title>Entrada de Mercancía / Compras - Pinturas JAM</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <div class="container mt-5" style="max-width: 600px;">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h3 class="mb-0">?? Registrar Entrada de Mercancía</h3>
+    <div class="container mt-5 mb-5" style="max-width: 650px;">
+        <div class="card shadow border-0">
+            <div class="card-header bg-success text-white p-3 text-center">
+                <h3 class="mb-0 fw-bold">📦 Registrar Entrada / Compra a Proveedor</h3>
             </div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Seleccionar Producto:</label>
-                        <select name="producto_id" class="form-select" required>
-                            <option value="">-- Elige un producto --</option>
-                            {% for p in productos %}
-                            <option value="{{ p.id }}">{{ p.nombre }} ({{ p.color }})</option>
-                            {% endfor %}
-                        </select>
+            <div class="card-body p-4">
+                <form method="POST" action="/comprar">
+                    
+                    <!-- BUSCADOR TIPO LUPA PARA SELECCIONAR PRODUCTO -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold fs-5">🔍 Buscar y Seleccionar Producto:</label>
+                        <input type="text" id="input_busqueda_prod" class="form-control form-control-lg border-success fw-bold" placeholder="Escribe nombre, color o categoría..." autocomplete="off" required autofocus>
+                        <input type="hidden" name="producto_id" id="producto_id_hidden" required>
+                        <small class="text-muted">Escribe y selecciona la opción del listado desplegable.</small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Proveedor / Distribuidor:</label>
-                        <input type="text" name="proveedor" class="form-control" placeholder="Ej: Corimon, Montana, Dist. Central" required>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold fs-5">Proveedor:</label>
+                        <input type="text" name="proveedor" class="form-control form-control-lg" placeholder="Ej. Distribuidora Central..." required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Costo Unitario de Compra ($):</label>
-                        <input type="number" step="0.01" name="costo_unitario" class="form-control" placeholder="Costo por unidad" required>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold fs-5">Costo Unitario ($):</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-secondary text-white fw-bold">$</span>
+                                <input type="number" step="0.01" name="costo_unitario" class="form-control fw-bold" placeholder="0.00" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <label class="form-label fw-bold fs-5">Cantidad Comprada:</label>
+                            <input type="number" name="cantidad" min="1" class="form-control form-control-lg fw-bold text-success" placeholder="Cant." required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Cantidad de Unidades Recibidas:</label>
-                        <input type="number" name="cantidad" min="1" class="form-control" placeholder="Ej: 10" required>
+
+                    <div class="d-grid gap-3 mt-2">
+                        <button type="submit" class="btn btn-success btn-lg fw-bold py-3 fs-4 shadow">💾 Registrar Entrada de Stock</button>
+                        <a href="/" class="btn btn-outline-secondary btn-lg fw-bold py-2">Cancelar y Volver</a>
                     </div>
-                    <button type="submit" class="btn btn-primary fw-bold w-100 mb-2">? Registrar Compra y Sumar Stock</button>
-                    <a href="/" class="btn btn-secondary w-100">Cancelar</a>
                 </form>
             </div>
         </div>
     </div>
+
+    <!-- Script para el buscador tipo lupa -->
+    <script>
+        const inputBusqueda = document.getElementById('input_busqueda_prod');
+        const inputHiddenId = document.getElementById('producto_id_hidden');
+        
+        const datalist = document.createElement('datalist');
+        datalist.id = 'productos_lista_dinamica';
+        
+        {% for p in productos %}
+        {
+            let opt = document.createElement('option');
+            opt.value = "{{ p.nombre }} - {{ p.color }} [Cat: {{ p.categoria }}] (${{ '%.2f'|format(p.precio) }})";
+            opt.setAttribute('data-id', "{{ p.id }}");
+            datalist.appendChild(opt);
+        }
+        {% endfor %}
+        
+        document.body.appendChild(datalist);
+        inputBusqueda.setAttribute('list', 'productos_lista_dinamica');
+
+        inputBusqueda.addEventListener('input', function(e) {
+            let val = e.target.value;
+            let options = datalist.options;
+            inputHiddenId.value = '';
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === val) {
+                    inputHiddenId.value = options[i].getAttribute('data-id');
+                    break;
+                }
+            }
+        });
+    </script>
 </body>
 </html>
