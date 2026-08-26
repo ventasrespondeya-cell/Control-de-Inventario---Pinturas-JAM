@@ -7,14 +7,13 @@ app.secret_key = 'pinturas_jam_secret_key_2026'
 
 DB_NAME = 'pinturas_jam.db'
 
-# Lista oficial de categorías del negocio
+# Categorías oficiales correctas del negocio
 CATEGORIAS_PRODUCTOS = [
-    "Flexipack",
-    "Cuñetes",
-    "Galones",
-    "Medio Galón",
+    "Flexiplack Interior",
+    "Flexiplack Exterior",
+    "Cuñete Interior",
+    "Cuñete Exterior",
     "Herramientas",
-    "Especiales y Solventes",
     "Otros"
 ]
 
@@ -103,7 +102,6 @@ def login_required(f):
 def login():
     error = None
     if request.method == 'POST':
-        # Robusto: acepta tanto 'username' como 'usuario' de cualquier formulario
         username = request.form.get('username') or request.form.get('usuario')
         password = request.form.get('password') or request.form.get('contrasena')
         
