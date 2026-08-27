@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, Response, session
 from functools import wraps
+from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import csv
@@ -8,6 +9,9 @@ import os
 
 app = Flask(__name__)
 app.secret_key = 'J4m_P1ntur4s#2026!k9$mX8zQ2Lp_SecureKey'
+
+# Configuración de ProxyFix para Render
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 def conectar_db():
     DATABASE_URL = os.environ.get('DATABASE_URL')
