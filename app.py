@@ -151,19 +151,38 @@ def inicio():
     conn = conectar_db()
     cursor = conn.cursor()
     if busqueda:
-        # ILIKE es la forma en Postgres de buscar sin importar mayúsculas/minúsculas
-        cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
+        cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
     else:
         cursor.execute("SELECT * FROM productos ORDER BY id ASC")
     
     productos = cursor.fetchall()
+    
+    # Categorías requeridas
+    categorias_orden = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
+    productos_por_categoria = {cat: [] for cat in categorias_orden}
+    
+    # Agrupar cada producto en su correspondiente categoría
+    for p in productos:
+        cat_prod = (p['categoria'] or '').strip()
+        cat_asignada = 'Otros'
+        for cat_def in ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas']:
+            if cat_def.lower() in cat_prod.lower():
+                cat_asignada = cat_def
+                break
+        productos_por_categoria[cat_asignada].append(p)
     
     cursor.execute("SELECT SUM(precio * stock_actual) as total FROM productos")
     resultado_total = cursor.fetchone()
     valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
-    return render_template('index.html', productos=productos, busqueda=busqueda, valor_total=valor_total)
+    return render_template(
+        'index.html', 
+        productos=productos, 
+        productos_por_categoria=productos_por_categoria, 
+        busqueda=busqueda, 
+        valor_total=valor_total
+    )
 
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
@@ -372,7 +391,6 @@ def exportar():
 def exportar_ventas_dia(fecha):
     conn = conectar_db()
     cursor = conn.cursor()
-    # Se formatea la fecha como texto para que el Excel lo lea correctamente
     cursor.execute("SELECT id, TO_CHAR(fecha, 'YYYY-MM-DD HH24:MI:SS') as fecha_texto, comprador, producto_nombre, cantidad, metodo_pago, total FROM historial_ventas WHERE DATE(fecha) = CAST(%s AS DATE) ORDER BY id ASC", (fecha,))
     ventas = cursor.fetchall()
     conn.close()
