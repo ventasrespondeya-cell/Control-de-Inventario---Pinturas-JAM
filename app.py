@@ -158,8 +158,8 @@ def inicio():
     productos = cursor.fetchall()
     
     # Categorías requeridas
-    categorias_orden = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
-    productos_por_categoria = {cat: [] for cat in categorias_orden}
+    categorias = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
+    productos_agrupados = {cat: [] for cat in categorias}
     
     # Agrupar cada producto en su correspondiente categoría
     for p in productos:
@@ -169,7 +169,7 @@ def inicio():
             if cat_def.lower() in cat_prod.lower():
                 cat_asignada = cat_def
                 break
-        productos_por_categoria[cat_asignada].append(p)
+        productos_agrupados[cat_asignada].append(p)
     
     cursor.execute("SELECT SUM(precio * stock_actual) as total FROM productos")
     resultado_total = cursor.fetchone()
@@ -179,7 +179,8 @@ def inicio():
     return render_template(
         'index.html', 
         productos=productos, 
-        productos_por_categoria=productos_por_categoria, 
+        categorias=categorias,
+        productos_agrupados=productos_agrupados, 
         busqueda=busqueda, 
         valor_total=valor_total
     )
@@ -187,6 +188,7 @@ def inicio():
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
 def agregar():
+    categorias = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
     if request.method == 'POST':
         categoria = request.form['categoria']
         nombre = request.form['nombre']
@@ -200,7 +202,7 @@ def agregar():
         conn.commit()
         conn.close()
         return redirect(url_for('inicio'))
-    return render_template('agregar.html')
+    return render_template('agregar.html', categorias=categorias)
 
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
