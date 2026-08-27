@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Generar Cotización - Pinturas JAM</title>
+    <title>Generar Cotización o Venta Múltiple - Pinturas JAM</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -10,7 +10,7 @@
     <div class="container mt-4 mb-5" style="max-width: 950px;">
         <div class="card shadow-lg border-0">
             <div class="card-header bg-dark text-white p-4 d-flex justify-content-between align-items-center">
-                <h2 class="mb-0 fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Generador de Cotizaciones</h2>
+                <h2 class="mb-0 fw-bold"><i class="fas fa-shopping-cart me-2"></i> Cotizador / Venta Múltiple</h2>
                 <a href="/" class="btn btn-outline-light fw-bold fs-5">Volver al Inicio</a>
             </div>
             
@@ -19,14 +19,14 @@
                     
                     <!-- Datos del Cliente y Método de Pago -->
                     <div class="mb-5 bg-light p-4 rounded border">
-                        <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-user-tie me-2"></i> Detalles de la Cotización</h4>
+                        <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-user-tie me-2"></i> Detalles de la Operación</h4>
                         <div class="row">
                             <div class="col-md-6 mb-3 mb-md-0">
                                 <label class="form-label fw-bold fs-5">Cliente o Empresa:</label>
                                 <input type="text" name="cliente" class="form-control form-control-lg border-primary" placeholder="Ej. Constructora Los Andes..." required autofocus>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold fs-5">Método de Pago Sugerido:</label>
+                                <label class="form-label fw-bold fs-5">Método de Pago:</label>
                                 <select name="metodo_pago" class="form-select form-select-lg border-primary fw-bold" required>
                                     <option value="Efectivo (Bs)">💵 Efectivo (Bolívares)</option>
                                     <option value="Divisas (USD/EUR)">💵 Divisas (Efectivo USD/EUR)</option>
@@ -40,7 +40,7 @@
                     </div>
 
                     <!-- Lista de Productos Dinámica con Buscador Lupa -->
-                    <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-paint-roller me-2"></i> Productos a Cotizar</h4>
+                    <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-paint-roller me-2"></i> Productos a Agregar</h4>
                     <div class="table-responsive mb-3 shadow-sm">
                         <table class="table table-bordered align-middle bg-white" id="tabla-productos">
                             <thead class="table-dark fs-5">
@@ -71,19 +71,27 @@
 
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-5 gap-3">
                         <button type="button" class="btn btn-outline-primary btn-lg fw-bold shadow-sm" onclick="agregarFila()">
-                            <i class="fas fa-plus-circle me-1"></i> Añadir otra pintura a la lista
+                            <i class="fas fa-plus-circle me-1"></i> Añadir otro producto
                         </button>
                         
                         <div class="text-end bg-dark text-white p-3 rounded shadow-lg border border-warning">
-                            <span class="fs-5 text-light">Total Estimado:</span><br>
+                            <span class="fs-5 text-light">Total a Procesar:</span><br>
                             <span class="fs-1 fw-bold text-warning" id="total-cotizacion">$0.00</span>
                         </div>
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg fw-bold py-4 fs-3 shadow-lg">
-                            <i class="fas fa-print me-2"></i> Generar Documento de Cotización
-                        </button>
+                    <!-- BOTONES DE ACCIÓN: PROCESAR VENTA O IMPRIMIR COTIZACIÓN -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <button type="submit" name="accion" value="vender" class="btn btn-success btn-lg fw-bold py-3 fs-4 shadow w-100">
+                                <i class="fas fa-cart-check me-2"></i> 🛒 PROCESAR VENTA MÚLTIPLE
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" name="accion" value="cotizar" class="btn btn-dark btn-lg fw-bold py-3 fs-4 shadow w-100">
+                                <i class="fas fa-print me-2"></i> 📝 SOLO GENERAR COTIZACIÓN
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -186,7 +194,7 @@
                 btn.closest('tr').remove();
                 calcularTotal();
             } else {
-                alert("Debe haber al menos un producto en la cotización.");
+                alert("Debe haber al menos un producto en la lista.");
             }
         }
     </script>
