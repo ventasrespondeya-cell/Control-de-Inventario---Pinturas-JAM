@@ -288,33 +288,6 @@ def vender(id):
     conn.close()
     return render_template('vender.html', producto=prod)
 
-@app.route('/comprar', methods=['GET', 'POST'])
-@login_required
-def comprar():
-    conn = conectar_db()
-    cursor = conn.cursor()
-    if request.method == 'POST':
-        producto_id = int(request.form['producto_id'])
-        proveedor = request.form['proveedor']
-        costo_unitario = float(request.form['costo_unitario'])
-        cantidad = int(request.form['cantidad'])
-        costo_total = costo_unitario * cantidad
-        
-        cursor.execute("SELECT nombre, stock_actual FROM productos WHERE id = %s", (producto_id,))
-        prod = cursor.fetchone()
-        if prod:
-            producto_nombre = prod['nombre']
-            nuevo_stock = prod['stock_actual'] + cantidad
-            cursor.execute("""INSERT INTO historial_compras (producto_id, producto_nombre, proveedor, costo_unitario, cantidad, costo_total) VALUES (%s, %s, %s, %s, %s, %s)""", (producto_id, producto_nombre, proveedor, costo_unitario, cantidad, costo_total))
-            cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, producto_id))
-            conn.commit()
-            conn.close()
-            return redirect(url_for('inicio'))
-    cursor.execute("SELECT id, nombre, color FROM productos ORDER BY nombre ASC")
-    productos = cursor.fetchall()
-    conn.close()
-    return render_template('comprar.html', productos=productos)
-
 @app.route('/caja')
 @login_required
 def caja():
