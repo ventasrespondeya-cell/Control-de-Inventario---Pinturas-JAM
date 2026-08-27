@@ -251,7 +251,7 @@ def vender(id):
             nuevo_stock = prod['stock_actual'] - cantidad
             total = prod['precio'] * cantidad
             cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, id))
-            cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) VALUES (%s, %s, %s, %s, %s, %s)""", (prod['nombre'], prod['precio'], comprador, metodo_pago, cantidad, total))
+            cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) VALUES (%s, %s, %s, %s, %s, %s)""", (f"{prod['nombre']} ({prod['color']})", prod['precio'], comprador, metodo_pago, cantidad, total))
             conn.commit()
             conn.close()
             return redirect(url_for('inicio'))
@@ -442,6 +442,7 @@ def reportes():
     conn.close()
     return render_template('reportes.html', top_productos=top_productos, ventas_dias=ventas_dias, total_ingresos=total_ingresos, total_inversion=total_inversion, ganancia_estimada=ganancia_estimada)
 
+# --- COTIZADOR / VENTA MÚLTIPLE (CARRITO) ---
 @app.route('/cotizar', methods=['GET', 'POST'])
 @login_required
 def cotizar():
@@ -449,23 +450,49 @@ def cotizar():
     cursor = conn.cursor()
     if request.method == 'POST':
         cliente = request.form.get('cliente', 'Cliente Estimado')
+        metodo_pago = request.form.get('metodo_pago', 'Efectivo')
+        accion = request.form.get('accion', 'cotizar')
         producto_ids = request.form.getlist('producto_id[]')
         cantidades = request.form.getlist('cantidad[]')
+        
         items = []
         subtotal = 0.0
+        
         for p_id, cant_str in zip(producto_ids, cantidades):
             if p_id and cant_str:
                 cant = int(cant_str)
                 if cant > 0:
-                    cursor.execute("SELECT nombre, color, precio FROM productos WHERE id = %s", (p_id,))
+                    cursor.execute("SELECT id, nombre, color, precio, stock_actual FROM productos WHERE id = %s", (p_id,))
                     prod = cursor.fetchone()
                     if prod:
-                        total_item = prod['precio'] * cant
+                        total_item = float(prod['precio']) * cant
                         subtotal += total_item
-                        items.append({'nombre': prod['nombre'], 'color': prod['color'], 'precio': prod['precio'], 'cantidad': cant, 'total': total_item})
+                        items.append({
+                            'id': prod['id'],
+                            'nombre': prod['nombre'],
+                            'color': prod['color'],
+                            'precio': float(prod['precio']),
+                            'cantidad': cant,
+                            'total': total_item
+                        })
+                        
+                        # Si presionaron "🛒 PROCESAR VENTA MÚLTIPLE"
+                        if accion == 'vender':
+                            nuevo_stock = prod['stock_actual'] - cant
+                            cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, prod['id']))
+                            cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) 
+                                              VALUES (%s, %s, %s, %s, %s, %s)""", 
+                                           (f"{prod['nombre']} ({prod['color']})", prod['precio'], cliente, metodo_pago, cant, total_item))
+        
+        conn.commit()
         conn.close()
-        return render_template('cotizacion_imprimir.html', cliente=cliente, items=items, subtotal=subtotal)
-    cursor.execute("SELECT id, nombre, color, precio FROM productos ORDER BY nombre ASC")
+        
+        if accion == 'vender':
+            return redirect(url_for('historial'))
+        else:
+            return render_template('cotizacion_imprimir.html', cliente=cliente, items=items, subtotal=subtotal)
+            
+    cursor.execute("SELECT id, nombre, color, precio, categoria FROM productos ORDER BY nombre ASC")
     productos = cursor.fetchall()
     conn.close()
     return render_template('cotizar.html', productos=productos)
