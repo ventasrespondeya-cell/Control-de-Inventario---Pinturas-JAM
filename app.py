@@ -185,24 +185,54 @@ def inicio():
         valor_total=valor_total
     )
 
-@app.route('/agregar', methods=['GET', 'POST'])
+@app.route('/comprar', methods=['GET', 'POST'])
 @login_required
-def agregar():
-    categorias = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
+def comprar():
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
     if request.method == 'POST':
-        categoria = request.form['categoria']
-        nombre = request.form['nombre']
-        color = request.form['color']
-        precio = request.form['precio']
-        stock_actual = request.form['stock_actual']
-        stock_minimo = request.form['stock_minimo']
-        conn = conectar_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO productos (categoria, nombre, color, precio, stock_actual, stock_minimo) VALUES (%s, %s, %s, %s, %s, %s)", (categoria, nombre, color, precio, stock_actual, stock_minimo))
+        # Recibimos el nombre del proveedor y las listas de productos de la factura
+        proveedor = request.form.get('proveedor', 'Proveedor General')
+        producto_ids = request.form.getlist('producto_id[]')
+        costos_unitarios = request.form.getlist('costo_unitario[]')
+        cantidades = request.form.getlist('cantidad[]')
+        
+        # Procesamos cada producto recibido
+        for p_id, costo_str, cant_str in zip(producto_ids, costos_unitarios, cantidades):
+            if p_id and cant_str and costo_str:
+                cant = int(cant_str)
+                costo_u = float(costo_str)
+                
+                if cant > 0:
+                    # Buscamos el producto en la BD
+                    cursor.execute("SELECT nombre, color, stock_actual FROM productos WHERE id = %s", (p_id,))
+                    prod = cursor.fetchone()
+                    
+                    if prod:
+                        costo_total = costo_u * cant
+                        nuevo_stock = prod['stock_actual'] + cant
+                        nombre_completo = f"{prod['nombre']} ({prod['color']})"
+                        
+                        # 1. Registrar en historial de compras
+                        cursor.execute("""INSERT INTO historial_compras 
+                                          (producto_id, producto_nombre, proveedor, costo_unitario, cantidad, costo_total) 
+                                          VALUES (%s, %s, %s, %s, %s, %s)""", 
+                                       (p_id, nombre_completo, proveedor, costo_u, cant, costo_total))
+                        
+                        # 2. Sumar el stock al inventario
+                        cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, p_id))
+        
         conn.commit()
         conn.close()
-        return redirect(url_for('inicio'))
-    return render_template('agregar.html', categorias=categorias)
+        # Redirigir al historial para ver la factura registrada
+        return redirect(url_for('historial_compras'))
+
+    # Si es GET, enviamos los productos para la barra de búsqueda
+    cursor.execute("SELECT id, nombre, color, categoria FROM productos ORDER BY nombre ASC")
+    productos = cursor.fetchall()
+    conn.close()
+    return render_template('comprar.html', productos=productos)
 
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
