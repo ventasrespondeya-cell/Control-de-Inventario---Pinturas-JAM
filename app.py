@@ -185,6 +185,27 @@ def inicio():
         valor_total=valor_total
     )
 
+@app.route('/agregar', methods=['GET', 'POST'])
+@login_required
+def agregar():
+    if request.method == 'POST':
+        categoria = request.form['categoria']
+        nombre = request.form['nombre']
+        color = request.form['color']
+        precio = request.form['precio']
+        stock_actual = request.form['stock_actual']
+        stock_minimo = request.form['stock_minimo']
+        
+        conn = conectar_db()
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO productos (categoria, nombre, color, precio, stock_actual, stock_minimo) 
+                          VALUES (%s, %s, %s, %s, %s, %s)''', 
+                       (categoria, nombre, color, precio, stock_actual, stock_minimo))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('inicio'))
+    return render_template('agregar.html')
+
 @app.route('/comprar', methods=['GET', 'POST'])
 @login_required
 def comprar():
