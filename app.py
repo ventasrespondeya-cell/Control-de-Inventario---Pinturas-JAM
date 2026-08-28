@@ -22,12 +22,11 @@ def conectar_db():
 
 def inicializar_db():
     if not os.environ.get('DATABASE_URL'):
-        return # Si no estamos en Render aún, no intenta inicializar para evitar errores
+        return
         
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Tabla productos
     cursor.execute('''CREATE TABLE IF NOT EXISTS productos (
                         id SERIAL PRIMARY KEY, 
                         nombre TEXT NOT NULL, 
@@ -37,7 +36,6 @@ def inicializar_db():
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
     
-    # Tabla historial ventas
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_ventas (
                         id SERIAL PRIMARY KEY, 
                         producto_nombre TEXT NOT NULL, 
@@ -48,7 +46,6 @@ def inicializar_db():
                         total NUMERIC DEFAULT 0.0,
                         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Tabla historial compras
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_compras (
                         id SERIAL PRIMARY KEY, 
                         producto_id INTEGER NOT NULL,
@@ -59,13 +56,11 @@ def inicializar_db():
                         costo_total NUMERIC NOT NULL, 
                         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # --- TABLA DE USUARIOS WEB ---
     cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
                         id SERIAL PRIMARY KEY,
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
     
-    # Crear usuarios por defecto si la tabla está vacía
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
     if resultado['conteo'] == 0:
@@ -77,7 +72,6 @@ def inicializar_db():
 
 inicializar_db()
 
-# --- SISTEMA DE LOGIN ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -111,7 +105,6 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
-# --- GESTIÓN DE USUARIOS (Solo Gerente) ---
 @app.route('/usuarios', methods=['GET', 'POST'])
 @login_required
 def usuarios():
@@ -142,8 +135,6 @@ def usuarios():
     conn.close()
     return render_template('usuarios.html', lista_usuarios=lista_usuarios)
 
-# --- RUTAS PROTEGIDAS ---
-
 @app.route('/')
 @login_required
 def inicio():
@@ -157,15 +148,13 @@ def inicio():
     
     productos = cursor.fetchall()
     
-    # Categorías requeridas
-    categorias = ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas', 'Otros']
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     productos_agrupados = {cat: [] for cat in categorias}
     
-    # Agrupar cada producto en su correspondiente categoría
     for p in productos:
         cat_prod = (p['categoria'] or '').strip()
         cat_asignada = 'Otros'
-        for cat_def in ['Flexiplack', 'Cuñete', 'Galones', 'Herramientas']:
+        for cat_def in ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas']:
             if cat_def.lower() in cat_prod.lower():
                 cat_asignada = cat_def
                 break
@@ -176,27 +165,12 @@ def inicio():
     valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
-    return render_template(
-        'index.html', 
-        productos=productos, 
-        categorias=categorias,
-        productos_agrupados=productos_agrupados, 
-        busqueda=busqueda, 
-        valor_total=valor_total
-    )
+    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total)
 
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
 def agregar():
-    categorias = [
-        'Flexiplack Interior', 
-        'Flexiplack Exterior', 
-        'Cuñete Interior', 
-        'Cuñete Exterior', 
-        'Herramientas', 
-        'Otros'
-    ]
-    
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     if request.method == 'POST':
         categoria = request.form['categoria']
         nombre = request.form['nombre']
@@ -213,9 +187,7 @@ def agregar():
         conn.commit()
         conn.close()
         return redirect(url_for('inicio'))
-        
     return render_template('agregar.html', categorias=categorias)
-
 
 @app.route('/comprar', methods=['GET', 'POST'])
 @login_required
@@ -224,43 +196,30 @@ def comprar():
     cursor = conn.cursor()
     
     if request.method == 'POST':
-        # Recibimos el nombre del proveedor y las listas de productos de la factura
         proveedor = request.form.get('proveedor', 'Proveedor General')
         producto_ids = request.form.getlist('producto_id[]')
         costos_unitarios = request.form.getlist('costo_unitario[]')
         cantidades = request.form.getlist('cantidad[]')
         
-        # Procesamos cada producto recibido
         for p_id, costo_str, cant_str in zip(producto_ids, costos_unitarios, cantidades):
             if p_id and cant_str and costo_str:
                 cant = int(cant_str)
                 costo_u = float(costo_str)
-                
                 if cant > 0:
-                    # Buscamos el producto en la BD
                     cursor.execute("SELECT nombre, color, stock_actual FROM productos WHERE id = %s", (p_id,))
                     prod = cursor.fetchone()
-                    
                     if prod:
                         costo_total = costo_u * cant
                         nuevo_stock = prod['stock_actual'] + cant
                         nombre_completo = f"{prod['nombre']} ({prod['color']})"
                         
-                        # 1. Registrar en historial de compras
-                        cursor.execute("""INSERT INTO historial_compras 
-                                          (producto_id, producto_nombre, proveedor, costo_unitario, cantidad, costo_total) 
-                                          VALUES (%s, %s, %s, %s, %s, %s)""", 
-                                       (p_id, nombre_completo, proveedor, costo_u, cant, costo_total))
-                        
-                        # 2. Sumar el stock al inventario
+                        cursor.execute("""INSERT INTO historial_compras (producto_id, producto_nombre, proveedor, costo_unitario, cantidad, costo_total) VALUES (%s, %s, %s, %s, %s, %s)""", (p_id, nombre_completo, proveedor, costo_u, cant, costo_total))
                         cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, p_id))
         
         conn.commit()
         conn.close()
-        # Redirigir al historial para ver la factura registrada
         return redirect(url_for('historial_compras'))
 
-    # Si es GET, enviamos los productos para la barra de búsqueda
     cursor.execute("SELECT id, nombre, color, categoria FROM productos ORDER BY nombre ASC")
     productos = cursor.fetchall()
     conn.close()
@@ -269,6 +228,7 @@ def comprar():
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar(id):
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     conn = conectar_db()
     cursor = conn.cursor()
     if request.method == 'POST':
@@ -285,7 +245,7 @@ def editar(id):
     cursor.execute("SELECT * FROM productos WHERE id = %s", (id,))
     producto = cursor.fetchone()
     conn.close()
-    return render_template('editar.html', producto=producto)
+    return render_template('editar.html', producto=producto, categorias=categorias)
 
 @app.route('/eliminar/<int:id>')
 @login_required
@@ -296,7 +256,6 @@ def eliminar(id):
     conn.commit()
     conn.close()
     return redirect(url_for('inicio'))
-
 @app.route('/vender/<int:id>', methods=['GET', 'POST'])
 @login_required
 def vender(id):
@@ -342,10 +301,12 @@ def caja():
 def historial():
     conn = conectar_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT *, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha_corta FROM historial_ventas ORDER BY id DESC")
+    # Traemos las ventas y creamos una columna extra solo con la fecha (sin la hora)
+    cursor.execute("SELECT *, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha_corta FROM historial_ventas ORDER BY fecha DESC, id DESC")
     ventas_crudas = cursor.fetchall()
     conn.close()
 
+    # Aquí hacemos la magia: agrupamos las ventas por día y sumamos el total
     ventas_por_dia = {}
     for v in ventas_crudas:
         fecha = v['fecha_corta']
@@ -354,7 +315,9 @@ def historial():
         ventas_por_dia[fecha]['ventas'].append(v)
         ventas_por_dia[fecha]['total_dia'] += float(v['total'])
 
+    # Le enviamos esta información agrupada al HTML
     return render_template('historial.html', ventas_por_dia=ventas_por_dia)
+
 
 @app.route('/editar_venta/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -477,7 +440,6 @@ def reportes():
     conn.close()
     return render_template('reportes.html', top_productos=top_productos, ventas_dias=ventas_dias, total_ingresos=total_ingresos, total_inversion=total_inversion, ganancia_estimada=ganancia_estimada)
 
-# --- COTIZADOR / VENTA MÚLTIPLE (CARRITO) ---
 @app.route('/cotizar', methods=['GET', 'POST'])
 @login_required
 def cotizar():
@@ -511,7 +473,6 @@ def cotizar():
                             'total': total_item
                         })
                         
-                        # Si presionaron "🛒 PROCESAR VENTA MÚLTIPLE"
                         if accion == 'vender':
                             nuevo_stock = prod['stock_actual'] - cant
                             cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, prod['id']))
