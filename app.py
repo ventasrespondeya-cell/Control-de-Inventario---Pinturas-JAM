@@ -204,39 +204,6 @@ def agregar():
     conn.close()
     return render_template('agregar.html', categorias=categorias)
 
-@app.route('/editar/<int:id>', methods=['GET', 'POST'])
-@login_required
-def editar(id):
-    conn = conectar_db()
-    cursor = conn.cursor()
-    
-    if request.method == 'POST':
-        categoria = request.form.get('categoria', 'Otros').strip()
-        nombre = request.form.get('nombre', '').strip()
-        color = request.form.get('color', '').strip()
-        
-        try:
-            precio = float(request.form.get('precio', 0))
-            stock_actual = int(request.form.get('stock_actual', 0))
-            stock_minimo = int(request.form.get('stock_minimo', 0))
-        except ValueError:
-            precio, stock_actual, stock_minimo = 0.0, 0, 0
-            
-        cursor.execute('''UPDATE productos SET categoria = %s, nombre = %s, color = %s, precio = %s, stock_actual = %s, stock_minimo = %s WHERE id = %s''', 
-                       (categoria, nombre, color, precio, stock_actual, stock_minimo, id))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('inicio'))
-        
-    cursor.execute("SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL")
-    categorias_db = cursor.fetchall()
-    categorias = [c['categoria'] for c in categorias_db if c['categoria'].strip()]
-    
-    cursor.execute("SELECT * FROM productos WHERE id = %s", (id,))
-    producto = cursor.fetchone()
-    conn.close()
-    return render_template('editar.html', producto=producto, categorias=categorias)
-
 @app.route('/comprar', methods=['GET', 'POST'])
 @login_required
 def comprar():
@@ -272,7 +239,40 @@ def comprar():
     productos = cursor.fetchall()
     conn.close()
     return render_template('comprar.html', productos=productos)
-
+    
+@app.route('/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar(id):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        categoria = request.form.get('categoria', 'Otros').strip()
+        nombre = request.form.get('nombre', '').strip()
+        color = request.form.get('color', '').strip()
+        
+        try:
+            precio = float(request.form.get('precio', 0))
+            stock_actual = int(request.form.get('stock_actual', 0))
+            stock_minimo = int(request.form.get('stock_minimo', 0))
+        except ValueError:
+            precio, stock_actual, stock_minimo = 0.0, 0, 0
+            
+        cursor.execute('''UPDATE productos SET categoria = %s, nombre = %s, color = %s, precio = %s, stock_actual = %s, stock_minimo = %s WHERE id = %s''', 
+                       (categoria, nombre, color, precio, stock_actual, stock_minimo, id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('inicio'))
+        
+    cursor.execute("SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL")
+    categorias_db = cursor.fetchall()
+    categorias = [c['categoria'] for c in categorias_db if c['categoria'].strip()]
+    
+    cursor.execute("SELECT * FROM productos WHERE id = %s", (id,))
+    producto = cursor.fetchone()
+    conn.close()
+    return render_template('editar.html', producto=producto, categorias=categorias)
+    
 @app.route('/eliminar/<int:id>')
 @login_required
 def eliminar(id):
