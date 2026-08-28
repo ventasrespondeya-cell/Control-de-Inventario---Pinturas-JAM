@@ -188,6 +188,15 @@ def inicio():
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
 def agregar():
+    categorias = [
+        'Flexiplack Interior', 
+        'Flexiplack Exterior', 
+        'Cuñete Interior', 
+        'Cuñete Exterior', 
+        'Herramientas', 
+        'Otros'
+    ]
+    
     if request.method == 'POST':
         categoria = request.form['categoria']
         nombre = request.form['nombre']
@@ -204,7 +213,9 @@ def agregar():
         conn.commit()
         conn.close()
         return redirect(url_for('inicio'))
-    return render_template('agregar.html')
+        
+    return render_template('agregar.html', categorias=categorias)
+
 
 @app.route('/comprar', methods=['GET', 'POST'])
 @login_required
