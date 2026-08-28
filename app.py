@@ -149,51 +149,7 @@ def usuarios():
     conn.close()
     return render_template('usuarios.html', lista_usuarios=lista_usuarios)
 
-@app.route('/')
-@login_required
-def inicio():
-    busqueda = request.args.get('busqueda', '')
-    conn = conectar_db()
-    cursor = conn.cursor()
-    
-    # OBTENER TASA BCV DE LA BASE DE DATOS
-    cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
-    res_tasa = cursor.fetchone()
-    
-    if res_tasa:
-        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa['tasa_bcv'] else 36.50
-        fecha_act = res_tasa['fecha_act'] if res_tasa['fecha_act'] else "Sin registro"
-    else:
-        tasa_bcv = 36.50
-        fecha_act = "Sin registro"
-
-    if busqueda:
-        cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
-    else:
-        cursor.execute("SELECT * FROM productos ORDER BY id ASC")
-    
-    productos = cursor.fetchall()
-    
-    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
-    productos_agrupados = {cat: [] for cat in categorias}
-    
-    for p in productos:
-        cat_prod = (p['categoria'] or '').strip()
-        cat_asignada = 'Otros'
-        for cat_def in ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas']:
-            if cat_def.lower() in cat_prod.lower():
-                cat_asignada = cat_def
-                break
-        productos_agrupados[cat_asignada].append(p)
-    
-    cursor.execute("SELECT SUM(precio * stock_actual) as total FROM productos")
-    resultado_total = cursor.fetchone()
-    valor_total = float(resultado_total['total']) if resultado_total and resultado_total['total'] else 0.0
-    
-    conn.close()
-    
-    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total, tasa_bcv=tasa_bcv, fecha_act=fecha_act)
-
+sale una pantalla blanca de "Error Interno del Servidor"
 # --- NUEVA RUTA PARA QUE EL GERENTE CAMBIE LA TASA ---
 @app.route('/actualizar_tasa', methods=['POST'])
 @login_required
