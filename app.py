@@ -155,6 +155,13 @@ def inicio():
     busqueda = request.args.get('busqueda', '')
     conn = conectar_db()
     cursor = conn.cursor()
+    
+    # --- NUEVO: OBTENER TASA BCV DE LA BASE DE DATOS ---
+    cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
+    res_tasa = cursor.fetchone()
+    tasa_bcv = res_tasa['tasa_bcv'] if res_tasa else 36.50
+    fecha_act = res_tasa['fecha_act'] if res_tasa else "Desconocida"
+
     if busqueda:
         cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
     else:
@@ -179,7 +186,25 @@ def inicio():
     valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
-    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total)
+    
+    # --- NUEVO: ENVIAR TASA BCV A LA PANTALLA VISUAL ---
+    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total, tasa_bcv=tasa_bcv, fecha_act=fecha_act)
+
+# --- NUEVA RUTA PARA QUE EL GERENTE CAMBIE LA TASA ---
+@app.route('/actualizar_tasa', methods=['POST'])
+@login_required
+def actualizar_tasa():
+    if session.get('usuario') != 'gerente':
+        return redirect(url_for('inicio')) # Solo el gerente puede cambiarla
+        
+    nueva_tasa = request.form.get('tasa_bcv')
+    if nueva_tasa:
+        conn = conectar_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE configuracion SET tasa_bcv = %s, ultima_actualizacion = CURRENT_TIMESTAMP", (nueva_tasa,))
+        conn.commit()
+        conn.close()
+    return redirect(url_for('inicio'))
 
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
