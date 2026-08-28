@@ -27,7 +27,6 @@ def inicializar_db():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Crear tablas si no existen
     cursor.execute('''CREATE TABLE IF NOT EXISTS productos (
                         id SERIAL PRIMARY KEY, 
                         nombre TEXT NOT NULL, 
@@ -36,8 +35,6 @@ def inicializar_db():
                         stock_actual INTEGER NOT NULL, 
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
-    
-    cursor.execute('''ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria TEXT DEFAULT 'Pinturas y Acabados' ''')
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_ventas (
                         id SERIAL PRIMARY KEY, 
@@ -64,24 +61,11 @@ def inicializar_db():
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
     
-    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracion (
-                        id SERIAL PRIMARY KEY,
-                        tasa_bcv NUMERIC DEFAULT 0.0,
-                        ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
-    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tasa_bcv NUMERIC DEFAULT 0.0''')
-    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP''')
-    
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
     if resultado['conteo'] == 0:
         cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("gerente", "G3r3nt3#JAM.2026!x9"))
         cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("suegra", "Adm1n_JAM#9876!z"))
-    
-    cursor.execute("SELECT COUNT(*) as conteo FROM configuracion")
-    res_conf = cursor.fetchone()
-    if res_conf['conteo'] == 0:
-        cursor.execute("INSERT INTO configuracion (tasa_bcv) VALUES (36.50)")
         
     conn.commit()
     conn.close()
@@ -157,16 +141,6 @@ def inicio():
     busqueda = request.args.get('busqueda', '')
     conn = conectar_db()
     cursor = conn.cursor()
-    
-    try:
-        cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
-        res_tasa = cursor.fetchone()
-        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] is not None else 36.50
-        fecha_act = res_tasa['fecha_act'] if res_tasa and res_tasa['fecha_act'] else "Sin registro"
-    except Exception:
-        tasa_bcv = 36.50
-        fecha_act = "Sin registro"
-
     if busqueda:
         cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
     else:
@@ -174,78 +148,45 @@ def inicio():
     
     productos = cursor.fetchall()
     
-    # Conversión segura de Decimal a float para evitar conflictos con la tasa en Jinja2
-    for p in productos:
-        if p.get('precio') is not None:
-            p['precio'] = float(p['precio'])
-    
-    categorias = []
-    for p in productos:
-        cat = p['categoria'] if p.get('categoria') else 'Sin Categoría'
-        cat = cat.strip()
-        if cat not in categorias:
-            categorias.append(cat)
-            
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     productos_agrupados = {cat: [] for cat in categorias}
+    
     for p in productos:
-        cat = p['categoria'] if p.get('categoria') else 'Sin Categoría'
-        cat = cat.strip()
-        productos_agrupados[cat].append(p)
+        cat_prod = (p['categoria'] or '').strip()
+        cat_asignada = 'Otros'
+        for cat_def in ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas']:
+            if cat_def.lower() in cat_prod.lower():
+                cat_asignada = cat_def
+                break
+        productos_agrupados[cat_asignada].append(p)
     
     cursor.execute("SELECT SUM(precio * stock_actual) as total FROM productos")
     resultado_total = cursor.fetchone()
-    valor_total = float(resultado_total['total']) if resultado_total and resultado_total['total'] else 0.0
+    valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
-    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total, tasa_bcv=tasa_bcv, fecha_act=fecha_act)
-
-@app.route('/actualizar_tasa', methods=['POST'])
-@login_required
-def actualizar_tasa():
-    if session.get('usuario') != 'gerente':
-        return redirect(url_for('inicio'))
-        
-    nueva_tasa = request.form.get('tasa_bcv')
-    if nueva_tasa:
-        conn = conectar_db()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE configuracion SET tasa_bcv = %s, ultima_actualizacion = CURRENT_TIMESTAMP", (nueva_tasa,))
-        conn.commit()
-        conn.close()
-    return redirect(url_for('inicio'))
+    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total)
 
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
 def agregar():
-    conn = conectar_db()
-    cursor = conn.cursor()
-    
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     if request.method == 'POST':
-        categoria = request.form.get('categoria', 'Otros').strip()
-        nombre = request.form.get('nombre', '').strip()
-        color = request.form.get('color', '').strip()
+        categoria = request.form['categoria']
+        nombre = request.form['nombre']
+        color = request.form['color']
+        precio = request.form['precio']
+        stock_actual = request.form['stock_actual']
+        stock_minimo = request.form['stock_minimo']
         
-        try:
-            precio = float(request.form.get('precio', 0))
-            stock_actual = int(request.form.get('stock_actual', 0))
-            stock_minimo = int(request.form.get('stock_minimo', 0))
-        except ValueError:
-            precio, stock_actual, stock_minimo = 0.0, 0, 0
-            
+        conn = conectar_db()
+        cursor = conn.cursor()
         cursor.execute('''INSERT INTO productos (categoria, nombre, color, precio, stock_actual, stock_minimo) 
                           VALUES (%s, %s, %s, %s, %s, %s)''', 
                        (categoria, nombre, color, precio, stock_actual, stock_minimo))
         conn.commit()
         conn.close()
         return redirect(url_for('inicio'))
-        
-    cursor.execute("SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL")
-    categorias_db = cursor.fetchall()
-    categorias = [c['categoria'] for c in categorias_db if c['categoria'].strip()]
-    if not categorias:
-        categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
-        
-    conn.close()
     return render_template('agregar.html', categorias=categorias)
 
 @app.route('/comprar', methods=['GET', 'POST'])
@@ -283,40 +224,29 @@ def comprar():
     productos = cursor.fetchall()
     conn.close()
     return render_template('comprar.html', productos=productos)
-    
+
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar(id):
+    categorias = ['Flexiplack', 'Cuñete', 'Galón', 'Herramientas', 'Otros']
     conn = conectar_db()
     cursor = conn.cursor()
-    
     if request.method == 'POST':
-        categoria = request.form.get('categoria', 'Otros').strip()
-        nombre = request.form.get('nombre', '').strip()
-        color = request.form.get('color', '').strip()
-        
-        try:
-            precio = float(request.form.get('precio', 0))
-            stock_actual = int(request.form.get('stock_actual', 0))
-            stock_minimo = int(request.form.get('stock_minimo', 0))
-        except ValueError:
-            precio, stock_actual, stock_minimo = 0.0, 0, 0
-            
-        cursor.execute('''UPDATE productos SET categoria = %s, nombre = %s, color = %s, precio = %s, stock_actual = %s, stock_minimo = %s WHERE id = %s''', 
-                       (categoria, nombre, color, precio, stock_actual, stock_minimo, id))
+        categoria = request.form['categoria']
+        nombre = request.form['nombre']
+        color = request.form['color']
+        precio = request.form['precio']
+        stock_actual = request.form['stock_actual']
+        stock_minimo = request.form['stock_minimo']
+        cursor.execute('''UPDATE productos SET categoria = %s, nombre = %s, color = %s, precio = %s, stock_actual = %s, stock_minimo = %s WHERE id = %s''', (categoria, nombre, color, precio, stock_actual, stock_minimo, id))
         conn.commit()
         conn.close()
         return redirect(url_for('inicio'))
-        
-    cursor.execute("SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL")
-    categorias_db = cursor.fetchall()
-    categorias = [c['categoria'] for c in categorias_db if c['categoria'].strip()]
-    
     cursor.execute("SELECT * FROM productos WHERE id = %s", (id,))
     producto = cursor.fetchone()
     conn.close()
     return render_template('editar.html', producto=producto, categorias=categorias)
-    
+
 @app.route('/eliminar/<int:id>')
 @login_required
 def eliminar(id):
@@ -326,7 +256,6 @@ def eliminar(id):
     conn.commit()
     conn.close()
     return redirect(url_for('inicio'))
-
 @app.route('/vender/<int:id>', methods=['GET', 'POST'])
 @login_required
 def vender(id):
@@ -372,10 +301,12 @@ def caja():
 def historial():
     conn = conectar_db()
     cursor = conn.cursor()
+    # Traemos las ventas y creamos una columna extra solo con la fecha (sin la hora)
     cursor.execute("SELECT *, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha_corta FROM historial_ventas ORDER BY fecha DESC, id DESC")
     ventas_crudas = cursor.fetchall()
     conn.close()
 
+    # Aquí hacemos la magia: agrupamos las ventas por día y sumamos el total
     ventas_por_dia = {}
     for v in ventas_crudas:
         fecha = v['fecha_corta']
@@ -384,7 +315,9 @@ def historial():
         ventas_por_dia[fecha]['ventas'].append(v)
         ventas_por_dia[fecha]['total_dia'] += float(v['total'])
 
+    # Le enviamos esta información agrupada al HTML
     return render_template('historial.html', ventas_por_dia=ventas_por_dia)
+
 
 @app.route('/editar_venta/<int:id>', methods=['GET', 'POST'])
 @login_required
