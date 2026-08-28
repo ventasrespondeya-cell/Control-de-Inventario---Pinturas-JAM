@@ -27,6 +27,7 @@ def inicializar_db():
     conn = conectar_db()
     cursor = conn.cursor()
     
+    # --- TUS TABLAS INTACTAS ---
     cursor.execute('''CREATE TABLE IF NOT EXISTS productos (
                         id SERIAL PRIMARY KEY, 
                         nombre TEXT NOT NULL, 
@@ -61,11 +62,24 @@ def inicializar_db():
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
     
+    # --- NUEVA TABLA PARA GUARDAR LA TASA BCV ---
+    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+                        id SERIAL PRIMARY KEY,
+                        tasa_bcv NUMERIC DEFAULT 0.0,
+                        ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # --- TUS USUARIOS INTACTOS ---
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
     if resultado['conteo'] == 0:
-        cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("gerente", "G3r3nt3#JAM.2026!x9"))
+        cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("gerente", "gerente1234"))
         cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("suegra", "Adm1n_JAM#9876!z"))
+    
+    # --- CREAR LA TASA INICIAL SI NO EXISTE ---
+    cursor.execute("SELECT COUNT(*) as conteo FROM configuracion")
+    res_conf = cursor.fetchone()
+    if res_conf['conteo'] == 0:
+        cursor.execute("INSERT INTO configuracion (tasa_bcv) VALUES (36.50)")
         
     conn.commit()
     conn.close()
