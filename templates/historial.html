@@ -10,47 +10,51 @@
 
 <div class="container mt-4 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>📜 Historial de Ventas por Día</h2>
-        <div>
-            <a href="/" class="btn btn-secondary">⬅️ Volver al Inicio</a>
-            <a href="/limpiar_historial" class="btn btn-danger" onclick="return confirm('¿Estás seguro de borrar TODO el historial?');">🗑️ Limpiar Historial</a>
+        <h2>📜 Historial de Ventas</h2>
+        <div class="d-flex gap-2">
+            <a href="/" class="btn btn-secondary">⬅️ Inicio</a>
+            <a href="/limpiar_historial" class="btn btn-outline-danger" onclick="return confirm('¿Borrar TODO el historial?');">🗑️ Limpiar Todo</a>
         </div>
     </div>
 
     {% if ventas_por_dia %}
         {% for fecha, datos in ventas_por_dia.items() %}
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📅 Fecha: {{ fecha }}</h5>
-                    <h5 class="mb-0">💰 Total del Día: ${{ "%.2f"|format(datos.total_dia) }}</h5>
+            <div class="card mb-4 border-0 shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0">📅 {{ fecha }}</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <h5 class="mb-0 text-success fw-bold">Total: ${{ "%.2f"|format(datos.total_dia) }}</h5>
+                        <!-- BOTÓN DE EXCEL POR FECHA -->
+                        <a href="/exportar_ventas_dia/{{ fecha }}" class="btn btn-success btn-sm">📊 Excel del Día</a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-striped table-hover mb-0">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Recibo #</th>
+                                    <th>#</th>
                                     <th>Comprador</th>
                                     <th>Producto</th>
                                     <th>Cant.</th>
-                                    <th>Método Pago</th>
-                                    <th>Total ($)</th>
+                                    <th>Pago</th>
+                                    <th>Total</th>
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for venta in datos.ventas %}
                                 <tr>
-                                    <td>{{ venta.id }}</td>
+                                    <td class="text-muted">{{ venta.id }}</td>
                                     <td>{{ venta.comprador }}</td>
                                     <td>{{ venta.producto_nombre }}</td>
                                     <td>{{ venta.cantidad }}</td>
-                                    <td>{{ venta.metodo_pago }}</td>
-                                    <td class="fw-bold text-success">${{ "%.2f"|format(venta.total) }}</td>
+                                    <td><span class="badge bg-secondary">{{ venta.metodo_pago }}</span></td>
+                                    <td class="fw-bold">${{ "%.2f"|format(venta.total) }}</td>
                                     <td class="text-center">
-                                        <a href="/ticket/{{ venta.id }}" class="btn btn-sm btn-info text-white">🎫 Ver</a>
-                                        <a href="/editar_venta/{{ venta.id }}" class="btn btn-sm btn-warning">✏️ Editar</a>
-                                        <a href="/eliminar_venta/{{ venta.id }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Borrar esta venta?');">❌</a>
+                                        <a href="/ticket/{{ venta.id }}" class="btn btn-sm btn-info text-white" title="Ver Ticket">🎫</a>
+                                        <a href="/editar_venta/{{ venta.id }}" class="btn btn-sm btn-warning" title="Editar">✏️</a>
+                                        <a href="/eliminar_venta/{{ venta.id }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Borrar venta?');" title="Eliminar">❌</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -61,8 +65,9 @@
             </div>
         {% endfor %}
     {% else %}
-        <div class="alert alert-info text-center">
-            Aún no hay ventas registradas en el historial.
+        <div class="alert alert-info text-center py-4 shadow-sm">
+            <h4>No hay ventas registradas aún</h4>
+            <p class="mb-0">Las ventas que realices aparecerán aquí agrupadas por día.</p>
         </div>
     {% endif %}
 </div>
