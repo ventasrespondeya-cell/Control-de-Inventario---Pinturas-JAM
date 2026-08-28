@@ -28,6 +28,7 @@
                     <a href="/historial" class="btn btn-secondary btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-list-alt me-1"></i> Historial Ventas</a>
                     <a href="/reportes" class="btn btn-info text-white btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-chart-line me-1"></i> Reportes</a>
                     <a href="/agregar" class="btn btn-light text-primary btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-plus-circle me-1"></i> Nuevo Producto</a>
+                        <a href="/exportar" class="btn btn-success">📊 Descargar Inventario en Excel</a>
                     {% if session.get('usuario') == 'gerente' %}
                     <a href="/usuarios" class="btn btn-danger btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-users me-1"></i> Usuarios</a>
                     {% endif %}
