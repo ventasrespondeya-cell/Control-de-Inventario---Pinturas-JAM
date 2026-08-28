@@ -27,6 +27,7 @@ def inicializar_db():
     conn = conectar_db()
     cursor = conn.cursor()
     
+    # Crear tablas si no existen
     cursor.execute('''CREATE TABLE IF NOT EXISTS productos (
                         id SERIAL PRIMARY KEY, 
                         nombre TEXT NOT NULL, 
@@ -35,6 +36,9 @@ def inicializar_db():
                         stock_actual INTEGER NOT NULL, 
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
+    
+    # Asegurar columna categoria si la tabla ya existía sin ella
+    cursor.execute('''ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria TEXT DEFAULT 'Pinturas y Acabados' ''')
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_ventas (
                         id SERIAL PRIMARY KEY, 
@@ -65,6 +69,10 @@ def inicializar_db():
                         id SERIAL PRIMARY KEY,
                         tasa_bcv NUMERIC DEFAULT 0.0,
                         ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Asegurar columnas de configuración si la tabla ya existía
+    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tasa_bcv NUMERIC DEFAULT 0.0''')
+    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP''')
     
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
@@ -152,13 +160,13 @@ def inicio():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
-    res_tasa = cursor.fetchone()
-    
-    if res_tasa:
-        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa['tasa_bcv'] else 36.50
-        fecha_act = res_tasa['fecha_act'] if res_tasa['fecha_act'] else "Sin registro"
-    else:
+    # Lectura protegida de la tasa BCV
+    try:
+        cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
+        res_tasa = cursor.fetchone()
+        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] else 36.50
+        fecha_act = res_tasa['fecha_act'] if res_tasa and res_tasa['fecha_act'] else "Sin registro"
+    except Exception:
         tasa_bcv = 36.50
         fecha_act = "Sin registro"
 
@@ -169,17 +177,16 @@ def inicio():
     
     productos = cursor.fetchall()
     
-    # Categorías dinámicas exactas basadas en lo que tenga la base de datos
     categorias = []
     for p in productos:
-        cat = p['categoria'] if p['categoria'] else 'Sin Categoría'
+        cat = p['categoria'] if p.get('categoria') else 'Sin Categoría'
         cat = cat.strip()
         if cat not in categorias:
             categorias.append(cat)
             
     productos_agrupados = {cat: [] for cat in categorias}
     for p in productos:
-        cat = p['categoria'] if p['categoria'] else 'Sin Categoría'
+        cat = p['categoria'] if p.get('categoria') else 'Sin Categoría'
         cat = cat.strip()
         productos_agrupados[cat].append(p)
     
