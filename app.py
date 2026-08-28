@@ -3,6 +3,7 @@ from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from decimal import Decimal
 import csv
 import io
 import os
@@ -37,7 +38,6 @@ def inicializar_db():
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
     
-    # Asegurar columna categoria si la tabla ya existía sin ella
     cursor.execute('''ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria TEXT DEFAULT 'Pinturas y Acabados' ''')
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_ventas (
@@ -70,7 +70,6 @@ def inicializar_db():
                         tasa_bcv NUMERIC DEFAULT 0.0,
                         ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Asegurar columnas de configuración si la tabla ya existía
     cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tasa_bcv NUMERIC DEFAULT 0.0''')
     cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP''')
     
@@ -160,14 +159,14 @@ def inicio():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Lectura protegida de la tasa BCV
+    # Lectura protegida de la tasa BCV como Decimal para evitar conflictos
     try:
         cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
         res_tasa = cursor.fetchone()
-        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] else 36.50
+        tasa_bcv = res_tasa['tasa_bcv'] if res_tasa and res_tasa['tasa_bcv'] is not None else Decimal('36.50')
         fecha_act = res_tasa['fecha_act'] if res_tasa and res_tasa['fecha_act'] else "Sin registro"
     except Exception:
-        tasa_bcv = 36.50
+        tasa_bcv = Decimal('36.50')
         fecha_act = "Sin registro"
 
     if busqueda:
