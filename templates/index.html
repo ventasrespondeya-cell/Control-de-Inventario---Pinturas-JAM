@@ -24,10 +24,12 @@
                 <div class="d-flex flex-wrap gap-2">
                     <a href="/cotizar" class="btn btn-success btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-shopping-cart me-1"></i> Venta Múltiple / Cotizar</a>
                     <a href="/comprar" class="btn btn-primary btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-truck-loading me-1"></i> Entrada / Compras</a>
+                    <a href="/historial_compras" class="btn btn-dark btn-lg fw-bold flex-grow-1 shadow-sm border border-light"><i class="fas fa-boxes-packing me-1"></i> Hist. Compras</a>
                     <a href="/caja" class="btn btn-warning btn-lg fw-bold flex-grow-1 shadow-sm text-dark"><i class="fas fa-cash-register me-1"></i> Caja Diaria</a>
                     <a href="/historial" class="btn btn-secondary btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-list-alt me-1"></i> Historial Ventas</a>
                     <a href="/reportes" class="btn btn-info text-white btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-chart-line me-1"></i> Reportes</a>
                     <a href="/agregar" class="btn btn-light text-primary btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-plus-circle me-1"></i> Nuevo Producto</a>
+                    <a href="/exportar" class="btn btn-outline-success bg-white btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-file-excel me-1"></i> Excel Inventario</a>
                     {% if session.get('usuario') == 'gerente' %}
                     <a href="/usuarios" class="btn btn-danger btn-lg fw-bold flex-grow-1 shadow-sm"><i class="fas fa-users me-1"></i> Usuarios</a>
                     {% endif %}
