@@ -60,6 +60,21 @@ def inicializar_db():
                         id SERIAL PRIMARY KEY,
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
+
+    # NUEVAS TABLAS PARA EL SISTEMA DE CRÉDITOS
+    cursor.execute('''CREATE TABLE IF NOT EXISTS clientes_credito (
+                        id SERIAL PRIMARY KEY,
+                        nombre TEXT UNIQUE NOT NULL,
+                        saldo NUMERIC DEFAULT 0.0,
+                        ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS movimientos_credito (
+                        id SERIAL PRIMARY KEY,
+                        cliente_id INTEGER REFERENCES clientes_credito(id),
+                        tipo TEXT NOT NULL,
+                        monto NUMERIC NOT NULL,
+                        descripcion TEXT,
+                        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
@@ -79,6 +94,22 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+# FUNCIONES AUXILIARES PARA CRÉDITOS
+def registrar_cargo_credito(cursor, comprador, total, descripcion):
+    comprador = comprador.strip().upper()
+    cursor.execute("SELECT id FROM clientes_credito WHERE nombre = %s", (comprador,))
+    cliente = cursor.fetchone()
+    
+    if not cliente:
+        cursor.execute("INSERT INTO clientes_credito (nombre, saldo) VALUES (%s, %s) RETURNING id", (comprador, total))
+        cliente_id = cursor.fetchone()['id']
+    else:
+        cliente_id = cliente['id']
+        cursor.execute("UPDATE clientes_credito SET saldo = saldo + %s, ultima_actualizacion = CURRENT_TIMESTAMP WHERE id = %s", (total, cliente_id))
+        
+    cursor.execute("INSERT INTO movimientos_credito (cliente_id, tipo, monto, descripcion) VALUES (%s, %s, %s, %s)", 
+                   (cliente_id, 'Cargo', total, descripcion))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -256,6 +287,7 @@ def eliminar(id):
     conn.commit()
     conn.close()
     return redirect(url_for('inicio'))
+
 @app.route('/vender/<int:id>', methods=['GET', 'POST'])
 @login_required
 def vender(id):
@@ -268,11 +300,20 @@ def vender(id):
         cantidad = int(request.form['cantidad'])
         comprador = request.form['comprador']
         metodo_pago = request.form['metodo_pago']
+        
         if prod and prod['stock_actual'] >= cantidad:
             nuevo_stock = prod['stock_actual'] - cantidad
             total = prod['precio'] * cantidad
+            nombre_prod_completo = f"{prod['nombre']} ({prod['color']})"
+            
             cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, id))
-            cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) VALUES (%s, %s, %s, %s, %s, %s)""", (f"{prod['nombre']} ({prod['color']})", prod['precio'], comprador, metodo_pago, cantidad, total))
+            cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) VALUES (%s, %s, %s, %s, %s, %s)""", 
+                           (nombre_prod_completo, prod['precio'], comprador, metodo_pago, cantidad, total))
+            
+            # Lógica de crédito
+            if metodo_pago.lower() in ['crédito', 'credito', 'fiado']:
+                registrar_cargo_credito(cursor, comprador, total, f"Compra de {cantidad}x {nombre_prod_completo}")
+                
             conn.commit()
             conn.close()
             return redirect(url_for('inicio'))
@@ -301,12 +342,10 @@ def caja():
 def historial():
     conn = conectar_db()
     cursor = conn.cursor()
-    # Traemos las ventas y creamos una columna extra solo con la fecha (sin la hora)
     cursor.execute("SELECT *, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha_corta FROM historial_ventas ORDER BY fecha DESC, id DESC")
     ventas_crudas = cursor.fetchall()
     conn.close()
 
-    # Aquí hacemos la magia: agrupamos las ventas por día y sumamos el total
     ventas_por_dia = {}
     for v in ventas_crudas:
         fecha = v['fecha_corta']
@@ -315,9 +354,7 @@ def historial():
         ventas_por_dia[fecha]['ventas'].append(v)
         ventas_por_dia[fecha]['total_dia'] += float(v['total'])
 
-    # Le enviamos esta información agrupada al HTML
     return render_template('historial.html', ventas_por_dia=ventas_por_dia)
-
 
 @app.route('/editar_venta/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -475,11 +512,16 @@ def cotizar():
                         
                         if accion == 'vender':
                             nuevo_stock = prod['stock_actual'] - cant
+                            nombre_prod_completo = f"{prod['nombre']} ({prod['color']})"
                             cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, prod['id']))
                             cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) 
                                               VALUES (%s, %s, %s, %s, %s, %s)""", 
-                                           (f"{prod['nombre']} ({prod['color']})", prod['precio'], cliente, metodo_pago, cant, total_item))
+                                           (nombre_prod_completo, prod['precio'], cliente, metodo_pago, cant, total_item))
         
+        # Lógica de crédito para compra múltiple
+        if accion == 'vender' and metodo_pago.lower() in ['crédito', 'credito', 'fiado']:
+            registrar_cargo_credito(cursor, cliente, subtotal, "Compra múltiple (Ver historial de ventas)")
+            
         conn.commit()
         conn.close()
         
@@ -492,6 +534,66 @@ def cotizar():
     productos = cursor.fetchall()
     conn.close()
     return render_template('cotizar.html', productos=productos)
+
+# ------------- RUTAS NUEVAS PARA CREDITOS -------------
+
+@app.route('/creditos')
+@login_required
+def creditos():
+    conn = conectar_db()
+    cursor = conn.cursor()
+    # Traemos solo los clientes que nos deben algo
+    cursor.execute("SELECT * FROM clientes_credito WHERE saldo > 0 ORDER BY nombre ASC")
+    clientes = cursor.fetchall()
+    conn.close()
+    return render_template('creditos.html', clientes=clientes)
+
+@app.route('/abonar_credito/<int:cliente_id>', methods=['POST'])
+@login_required
+def abonar_credito(cliente_id):
+    monto = float(request.form['monto'])
+    metodo_pago = request.form.get('metodo_pago', 'Efectivo')
+    
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    # Obtener nombre del cliente
+    cursor.execute("SELECT nombre FROM clientes_credito WHERE id = %s", (cliente_id,))
+    cliente = cursor.fetchone()
+    
+    if cliente:
+        nombre_cliente = cliente['nombre']
+        
+        # 1. Restar el saldo de la cuenta
+        cursor.execute("UPDATE clientes_credito SET saldo = saldo - %s, ultima_actualizacion = CURRENT_TIMESTAMP WHERE id = %s", (monto, cliente_id))
+        
+        # 2. Registrar el movimiento (Abono)
+        cursor.execute("INSERT INTO movimientos_credito (cliente_id, tipo, monto, descripcion) VALUES (%s, %s, %s, %s)", 
+                       (cliente_id, 'Abono', monto, f'Abono en {metodo_pago}'))
+        
+        # 3. Ingresar ese dinero a la Caja del día como "Abono a Cuenta"
+        cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) 
+                          VALUES (%s, %s, %s, %s, %s, %s)""", 
+                       ('ABONO A CUENTA', monto, nombre_cliente, metodo_pago, 1, monto))
+        
+    conn.commit()
+    conn.close()
+    return redirect(url_for('creditos'))
+
+@app.route('/historial_credito/<int:cliente_id>')
+@login_required
+def historial_credito(cliente_id):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM clientes_credito WHERE id = %s", (cliente_id,))
+    cliente = cursor.fetchone()
+    
+    cursor.execute("SELECT *, TO_CHAR(fecha, 'DD/MM/YYYY HH12:MI AM') as fecha_formato FROM movimientos_credito WHERE cliente_id = %s ORDER BY id DESC", (cliente_id,))
+    movimientos = cursor.fetchall()
+    
+    conn.close()
+    return render_template('historial_credito.html', cliente=cliente, movimientos=movimientos)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
