@@ -3,7 +3,6 @@ from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from decimal import Decimal
 import csv
 import io
 import os
@@ -159,14 +158,13 @@ def inicio():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Lectura protegida de la tasa BCV como Decimal para evitar conflictos
     try:
         cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
         res_tasa = cursor.fetchone()
-        tasa_bcv = res_tasa['tasa_bcv'] if res_tasa and res_tasa['tasa_bcv'] is not None else Decimal('36.50')
+        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] is not None else 36.50
         fecha_act = res_tasa['fecha_act'] if res_tasa and res_tasa['fecha_act'] else "Sin registro"
     except Exception:
-        tasa_bcv = Decimal('36.50')
+        tasa_bcv = 36.50
         fecha_act = "Sin registro"
 
     if busqueda:
@@ -175,6 +173,11 @@ def inicio():
         cursor.execute("SELECT * FROM productos ORDER BY id ASC")
     
     productos = cursor.fetchall()
+    
+    # Conversión segura de Decimal a float para evitar conflictos con la tasa en Jinja2
+    for p in productos:
+        if p.get('precio') is not None:
+            p['precio'] = float(p['precio'])
     
     categorias = []
     for p in productos:
