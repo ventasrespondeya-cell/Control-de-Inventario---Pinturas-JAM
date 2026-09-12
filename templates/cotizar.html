@@ -27,19 +27,18 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold fs-5">Método de Pago:</label>
-                                <select name="metodo_pago" class="form-select form-select-lg border-primary fw-bold" required>
-                                    <option value="Efectivo">💵 Efectivo (USD / Bolívares)</option>
-                                    <option value="Punto">💳 Punto de Venta</option>
+                                <select name="metodo_pago" id="metodo_pago" class="form-select form-select-lg border-primary fw-bold" required onchange="calcularTotal()">
+                                    <option value="Punto de Venta">💳 Punto de Venta</option>
                                     <option value="Pago Móvil">📱 Pago Móvil</option>
-                                    <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                                    <option value="Efectivo">💵 Efectivo (USD)</option>
                                     <option value="USDT">🟡 USDT / Binance</option>
-                                    <option value="Crédito">📋 Crédito / Fiado</option>
+                                    <option value="Zelle">🏦 Zelle</option>
                                 </select>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Lista de Productos Dinámica -->
+                    <!-- Lista de Productos Dinámica con Buscador Lupa -->
                     <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-paint-roller me-2"></i> Productos a Agregar</h4>
                     <div class="table-responsive mb-3 shadow-sm">
                         <table class="table table-bordered align-middle bg-white" id="tabla-productos">
@@ -77,10 +76,12 @@
                         <div class="text-end bg-dark text-white p-3 rounded shadow-lg border border-warning">
                             <span class="fs-5 text-light">Total a Procesar:</span><br>
                             <span class="fs-1 fw-bold text-warning" id="total-cotizacion">$0.00</span>
+                            <!-- Se muestra en bolívares únicamente para Punto de Venta y Pago Móvil -->
+                            <div id="total-bs-container" class="fs-4 fw-bold text-info mt-1" style="display: none;"></div>
                         </div>
                     </div>
 
-                    <!-- BOTONES DE ACCIÓN -->
+                    <!-- BOTONES DE ACCIÓN: PROCESAR VENTA O IMPRIMIR COTIZACIÓN -->
                     <div class="row g-3">
                         <div class="col-md-6">
                             <button type="submit" name="accion" value="vender" class="btn btn-success btn-lg fw-bold py-3 fs-4 shadow w-100">
@@ -98,7 +99,10 @@
         </div>
     </div>
 
+    <!-- Script de búsqueda inteligente y cálculo dinámico -->
     <script>
+        const tasaBCV = {{ tasa_bcv|float }};
+
         const catalogoProductos = [
             {% for p in productos %}
             { id: "{{ p.id }}", texto: "{{ p.nombre }} - {{ p.color }} [{{ p.categoria }}] (${{ '%.2f'|format(p.precio|float) }})", precio: {{ p.precio|float }} },
@@ -107,6 +111,7 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             configurarFila(document.querySelector('.item-fila'));
+            calcularTotal();
         });
 
         function configurarFila(fila) {
@@ -165,6 +170,17 @@
             });
 
             document.getElementById('total-cotizacion').innerText = '$' + totalSuma.toFixed(2);
+
+            let metodoPago = document.getElementById('metodo_pago').value;
+            let contenedorBs = document.getElementById('total-bs-container');
+
+            if (metodoPago === "Punto de Venta" || metodoPago === "Pago Móvil") {
+                let totalBs = totalSuma * tasaBCV;
+                contenedorBs.innerText = 'Bs. ' + totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                contenedorBs.style.display = 'block';
+            } else {
+                contenedorBs.style.display = 'none';
+            }
         }
 
         function agregarFila() {
