@@ -6,6 +6,7 @@ from psycopg2.extras import RealDictCursor
 import csv
 import io
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'J4m_P1ntur4s#2026!k9$mX8zQ2Lp_SecureKey'
@@ -36,10 +37,10 @@ def inicializar_db():
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
     
-   # Nueva tabla para los Cierres de Caja Diarios (El Cuaderno de la Sra. Mishell)
+    # Se corrigió a SERIAL para PostgreSQL
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS cierres_diarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             fecha DATE DEFAULT CURRENT_DATE,
             tasa_bcv REAL,
             total_pago_movil_bs REAL,
@@ -75,7 +76,7 @@ def inicializar_db():
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
 
-    # NUEVAS TABLAS PARA EL SISTEMA DE CRÉDITOS
+    # TABLAS PARA EL SISTEMA DE CRÉDITOS
     cursor.execute('''CREATE TABLE IF NOT EXISTS clientes_credito (
                         id SERIAL PRIMARY KEY,
                         nombre TEXT UNIQUE NOT NULL,
@@ -89,12 +90,22 @@ def inicializar_db():
                         monto NUMERIC NOT NULL,
                         descripcion TEXT,
                         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # NUEVA TABLA: CONFIGURACIÓN (TASA BCV)
+    cursor.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+                        id SERIAL PRIMARY KEY,
+                        tasa_bcv NUMERIC DEFAULT 36.50,
+                        ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
     if resultado['conteo'] == 0:
         cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("gerente", "G3r3nt3#JAM.2026!x9"))
         cursor.execute("INSERT INTO usuarios (username, password) VALUES (%s, %s)", ("suegra", "Adm1n_JAM#9876!z"))
+        
+    cursor.execute("SELECT COUNT(*) as conteo FROM configuracion")
+    if cursor.fetchone()['conteo'] == 0:
+        cursor.execute("INSERT INTO configuracion (tasa_bcv) VALUES (36.50)")
         
     conn.commit()
     conn.close()
@@ -186,6 +197,13 @@ def inicio():
     busqueda = request.args.get('busqueda', '')
     conn = conectar_db()
     cursor = conn.cursor()
+    
+    # --- OBTENER TASA BCV ---
+    cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
+    res_tasa = cursor.fetchone()
+    tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa else 36.50
+    fecha_act = res_tasa['fecha_act'] if res_tasa else "Desconocida"
+
     if busqueda:
         cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
     else:
@@ -210,7 +228,23 @@ def inicio():
     valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
-    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total)
+    return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total, tasa_bcv=tasa_bcv, fecha_act=fecha_act)
+
+# --- NUEVA RUTA: ACTUALIZAR TASA ---
+@app.route('/actualizar_tasa', methods=['POST'])
+@login_required
+def actualizar_tasa():
+    if session.get('usuario') != 'gerente':
+        return redirect(url_for('inicio')) 
+        
+    nueva_tasa = request.form.get('tasa_bcv')
+    if nueva_tasa:
+        conn = conectar_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE configuracion SET tasa_bcv = %s, ultima_actualizacion = CURRENT_TIMESTAMP", (nueva_tasa,))
+        conn.commit()
+        conn.close()
+    return redirect(url_for('inicio'))
 
 @app.route('/agregar', methods=['GET', 'POST'])
 @login_required
@@ -549,14 +583,13 @@ def cotizar():
     conn.close()
     return render_template('cotizar.html', productos=productos)
 
-# ------------- RUTAS NUEVAS PARA CREDITOS -------------
+# RUTAS PARA CREDITOS 
 
 @app.route('/creditos')
 @login_required
 def creditos():
     conn = conectar_db()
     cursor = conn.cursor()
-    # Traemos solo los clientes que nos deben algo
     cursor.execute("SELECT * FROM clientes_credito WHERE saldo > 0 ORDER BY nombre ASC")
     clientes = cursor.fetchall()
     conn.close()
@@ -571,21 +604,14 @@ def abonar_credito(cliente_id):
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Obtener nombre del cliente
     cursor.execute("SELECT nombre FROM clientes_credito WHERE id = %s", (cliente_id,))
     cliente = cursor.fetchone()
     
     if cliente:
         nombre_cliente = cliente['nombre']
-        
-        # 1. Restar el saldo de la cuenta
         cursor.execute("UPDATE clientes_credito SET saldo = saldo - %s, ultima_actualizacion = CURRENT_TIMESTAMP WHERE id = %s", (monto, cliente_id))
-        
-        # 2. Registrar el movimiento (Abono)
         cursor.execute("INSERT INTO movimientos_credito (cliente_id, tipo, monto, descripcion) VALUES (%s, %s, %s, %s)", 
                        (cliente_id, 'Abono', monto, f'Abono en {metodo_pago}'))
-        
-        # 3. Ingresar ese dinero a la Caja del día como "Abono a Cuenta"
         cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) 
                           VALUES (%s, %s, %s, %s, %s, %s)""", 
                        ('ABONO A CUENTA', monto, nombre_cliente, metodo_pago, 1, monto))
@@ -609,14 +635,12 @@ def historial_credito(cliente_id):
     conn.close()
     return render_template('historial_credito.html', cliente=cliente, movimientos=movimientos)
 
-from datetime import datetime
 
 @app.route('/cuaderno_cierre', methods=['GET', 'POST'])
 def cuaderno_cierre():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Si la Sra. Mishell le da a "Guardar Cierre"
     if request.method == 'POST':
         tasa_bcv = request.form.get('tasa_bcv', 0.0)
         total_pago_movil_bs = request.form.get('total_pm_bs', 0.0)
@@ -625,24 +649,24 @@ def cuaderno_cierre():
         total_usdt = request.form.get('total_usdt', 0.0)
         notas = request.form.get('notas', '')
         
+        # Corregido de ? (SQLite) a %s (PostgreSQL)
         cursor.execute("""
             INSERT INTO cierres_diarios 
             (tasa_bcv, total_pago_movil_bs, total_punto_bs, total_efectivo_usd, total_usdt, notas) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (tasa_bcv, total_pago_movil_bs, total_punto_bs, total_efectivo_usd, total_usdt, notas))
         conn.commit()
         conn.close()
         return redirect(url_for('historial'))
 
-    # Si solo está viendo la pantalla (GET) traemos las ventas de HOY
+    # Corregido DATE('now', 'localtime') a CURRENT_DATE en PostgreSQL
     cursor.execute("""
         SELECT cantidad, producto_nombre as descripcion, metodo_pago, total 
         FROM historial_ventas 
-        WHERE DATE(fecha) = DATE('now', 'localtime')
+        WHERE DATE(fecha) = CURRENT_DATE
     """)
     ventas_hoy = cursor.fetchall()
     
-    # Pre-calcular totales en USD para enviarlos a la vista
     totales_usd = {
         'Pago Móvil': 0.0,
         'Punto': 0.0,
@@ -654,14 +678,14 @@ def cuaderno_cierre():
     for v in ventas_hoy:
         metodo = v['metodo_pago']
         if metodo in totales_usd:
-            totales_usd[metodo] += v['total']
+            totales_usd[metodo] += float(v['total'])
         else:
-            totales_usd['Efectivo'] += v['total'] # Por defecto si no coincide
+            totales_usd['Efectivo'] += float(v['total'])
             
     fecha_hoy = datetime.now().strftime("%d-%m-%y")
     conn.close()
     
     return render_template('cuaderno_cierre.html', ventas=ventas_hoy, totales_usd=totales_usd, fecha=fecha_hoy)
-    
-    if __name__ == '__main__':
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
