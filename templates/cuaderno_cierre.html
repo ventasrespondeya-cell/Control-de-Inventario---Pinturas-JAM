@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cuaderno de Cierre - Pinturas JAM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Estilos para que parezca una libreta de contabilidad */
+        .libreta {
+            background-color: #fff;
+            background-image: 
+                linear-gradient(#e1e1e1 1px, transparent 1px);
+            background-size: 100% 2.5rem;
+            border: 1px solid #ccc;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            padding: 2rem;
+            line-height: 2.5rem;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .header-libreta { border-bottom: 2px solid #ff6b6b; padding-bottom: 10px; margin-bottom: 20px;}
+        .columna-borde { border-right: 1px solid #ffb8b8; }
+        .tabla-libreta th { border-bottom: 2px solid #666; font-size: 0.9rem; text-transform: uppercase;}
+        .tabla-libreta td { border-bottom: 1px solid transparent; font-weight: bold; }
+        .nota-box { 
+            background: transparent; 
+            border: 1px dashed #666; 
+            width: 100%; 
+            font-family: inherit; 
+            font-size: 1.1rem;
+            line-height: 2.5rem;
+            resize: none;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between mb-3">
+            <a href="/" class="btn btn-secondary">← Volver</a>
+            <h4 class="text-primary fw-bold">📓 Cuadre de Caja Diario</h4>
+        </div>
+
+        <div class="libreta">
+            <div class="header-libreta d-flex justify-content-between">
+                <strong>FOLIO: Cierre Diario</strong>
+                <strong class="text-danger">{{ fecha }}</strong>
+            </div>
+
+            <!-- Entrada de Tasa BCV para calcular Bolívares -->
+            <div class="row mb-4 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-warning fw-bold text-dark">Tasa BCV Hoy (Bs):</span>
+                        <input type="number" step="0.01" id="tasa_bcv" class="form-control fw-bold" placeholder="Ej: 36.60" oninput="calcularBolivares()">
+                    </div>
+                </div>
+                <div class="col-md-7 text-end text-muted small">
+                    * Ingresa la tasa para calcular los montos exactos en Bolívares.
+                </div>
+            </div>
+
+            <!-- Tabla principal igual al cuaderno -->
+            <table class="table tabla-libreta table-borderless text-center align-middle w-100">
+                <thead>
+                    <tr>
+                        <th class="columna-borde">Cant</th>
+                        <th class="columna-borde text-start">Descripción</th>
+                        <th class="columna-borde text-primary">Pago Móvil (Bs)</th>
+                        <th class="columna-borde text-primary">Punto (Bs)</th>
+                        <th class="columna-borde text-success">Efectivo ($)</th>
+                        <th class="text-success">USDT ($)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in ventas %}
+                    <tr>
+                        <td class="columna-borde">{{ v.cantidad }}</td>
+                        <td class="columna-borde text-start">{{ v.descripcion }}</td>
+                        
+                        <td class="columna-borde text-primary">
+                            {% if v.metodo_pago == 'Pago Móvil' or v.metodo_pago == 'Transferencia' %}
+                                <span class="calc-pm" data-usd="{{ v.total }}">0.00</span>
+                            {% endif %}
+                        </td>
+                        <td class="columna-borde text-primary">
+                            {% if v.metodo_pago == 'Punto' %}
+                                <span class="calc-punto" data-usd="{{ v.total }}">0.00</span>
+                            {% endif %}
+                        </td>
+                        <td class="columna-borde text-success">
+                            {% if v.metodo_pago == 'Efectivo' %} {{ v.total }} {% endif %}
+                        </td>
+                        <td class="text-success">
+                            {% if v.metodo_pago == 'USDT' %} {{ v.total }} {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <hr class="mt-5 mb-4 border-dark">
+
+            <!-- Resumen Final -->
+            <form method="POST" action="/cuaderno_cierre">
+                <input type="hidden" name="tasa_bcv" id="hidden_tasa">
+                <input type="hidden" name="total_pm_bs" id="hidden_pm">
+                <input type="hidden" name="total_punto_bs" id="hidden_punto">
+                <input type="hidden" name="total_efectivo_usd" value="{{ totales_usd['Efectivo'] }}">
+                <input type="hidden" name="total_usdt" value="{{ totales_usd['USDT'] }}">
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <ul class="list-unstyled fw-bold">
+                            <li>USDT: <span class="text-success">{{ totales_usd['USDT'] }}</span></li>
+                            <li>EFECTIVO $: <span class="text-success">{{ totales_usd['Efectivo'] }}$</span></li>
+                            <li>PAGO MOVIL: <span class="text-primary" id="resumen_pm">0.00</span> Bs</li>
+                            <li>PUNTO: <span class="text-primary" id="resumen_punto">0.00</span> Bs</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-8">
+                        <strong>NOTA:</strong>
+                        <textarea name="notas" class="nota-box" rows="3" placeholder="Ej: Quedaron 131$ que son 16$ de caja, 65$ de la venta de hoy..."></textarea>
+                    </div>
+                </div>
+
+                <div class="text-end mt-4">
+                    <button type="submit" class="btn btn-success btn-lg fw-bold px-5">💾 Guardar Cierre en Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Lógica para que al escribir la Tasa BCV, todo se calcule en Bolívares instantáneamente
+        function calcularBolivares() {
+            let tasa = parseFloat(document.getElementById('tasa_bcv').value);
+            if(isNaN(tasa)) tasa = 0;
+
+            let totalPmBs = 0;
+            let totalPuntoBs = 0;
+
+            // Calcular fila por fila Pago Movil
+            document.querySelectorAll('.calc-pm').forEach(el => {
+                let usd = parseFloat(el.getAttribute('data-usd'));
+                let bs = usd * tasa;
+                el.innerText = bs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                totalPmBs += bs;
+            });
+
+            // Calcular fila por fila Punto
+            document.querySelectorAll('.calc-punto').forEach(el => {
+                let usd = parseFloat(el.getAttribute('data-usd'));
+                let bs = usd * tasa;
+                el.innerText = bs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                totalPuntoBs += bs;
+            });
+
+            // Actualizar Resumen
+            document.getElementById('resumen_pm').innerText = totalPmBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('resumen_punto').innerText = totalPuntoBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // Guardar en variables ocultas para enviar a la base de datos
+            document.getElementById('hidden_tasa').value = tasa;
+            document.getElementById('hidden_pm').value = totalPmBs;
+            document.getElementById('hidden_punto').value = totalPuntoBs;
+        }
+    </script>
+</body>
+</html>
