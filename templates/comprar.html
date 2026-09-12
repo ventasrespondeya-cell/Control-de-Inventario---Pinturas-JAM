@@ -83,7 +83,6 @@
     </div>
 
     <script>
-        // Catálogo para el buscador con datos inyectados por Flask
         const catalogoProductos = [
             {% for p in productos %}
             { id: "{{ p.id }}", texto: "{{ p.nombre }} - {{ p.color }} [{{ p.categoria }}]" },
@@ -98,7 +97,6 @@
             let inputBusqueda = fila.querySelector('.input-busqueda-prod');
             let inputId = fila.querySelector('.input-id-prod');
             
-            // Generar ID único para el datalist para que no choque con otras filas
             let listId = 'datalist_' + Math.random().toString(36).substr(2, 9);
             inputBusqueda.setAttribute('list', listId);
             
@@ -114,7 +112,6 @@
             
             fila.appendChild(datalist);
 
-            // Al seleccionar una opción, guardar su ID real
             inputBusqueda.addEventListener('input', function(e) {
                 let val = e.target.value;
                 inputId.value = '';
@@ -149,19 +146,17 @@
             let filas = tbody.getElementsByClassName('item-fila');
             let nuevaFila = filas[0].cloneNode(true);
             
-            // Limpiar valores de la fila clonada
             nuevaFila.querySelector('.input-busqueda-prod').value = '';
             nuevaFila.querySelector('.input-id-prod').value = '';
             nuevaFila.querySelector('.input-costo').value = '0.00';
             nuevaFila.querySelector('.input-cantidad').value = 1;
             nuevaFila.querySelector('.subtotal-fila').innerText = '$0.00';
             
-            // Quitar el datalist viejo
             let viejoDatalist = nuevaFila.querySelector('datalist');
             if(viejoDatalist) viejoDatalist.remove();
 
             tbody.appendChild(nuevaFila);
-            configurarFila(nuevaFila); // Configurar de nuevo para que tenga su propio datalist
+            configurarFila(nuevaFila);
             calcularTotal();
         }
 
