@@ -28,18 +28,18 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold fs-5">Método de Pago:</label>
                                 <select name="metodo_pago" class="form-select form-select-lg border-primary fw-bold" required>
-                                    <option value="Efectivo (Bs)">💵 Efectivo (Bolívares)</option>
-                                    <option value="Divisas (USD/EUR)">💵 Divisas (Efectivo USD/EUR)</option>
-                                    <option value="Punto de Venta">💳 Punto de Venta</option>
-                                    <option value="Pago Movil">📱 Pago Móvil</option>
+                                    <option value="Efectivo">💵 Efectivo (USD / Bolívares)</option>
+                                    <option value="Punto">💳 Punto de Venta</option>
+                                    <option value="Pago Móvil">📱 Pago Móvil</option>
                                     <option value="Transferencia">🏦 Transferencia Bancaria</option>
-                                    <option value="Binance">🟡 Binance (USDT)</option>
+                                    <option value="USDT">🟡 USDT / Binance</option>
+                                    <option value="Crédito">📋 Crédito / Fiado</option>
                                 </select>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Lista de Productos Dinámica con Buscador Lupa -->
+                    <!-- Lista de Productos Dinámica -->
                     <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-paint-roller me-2"></i> Productos a Agregar</h4>
                     <div class="table-responsive mb-3 shadow-sm">
                         <table class="table table-bordered align-middle bg-white" id="tabla-productos">
@@ -80,7 +80,7 @@
                         </div>
                     </div>
 
-                    <!-- BOTONES DE ACCIÓN: PROCESAR VENTA O IMPRIMIR COTIZACIÓN -->
+                    <!-- BOTONES DE ACCIÓN -->
                     <div class="row g-3">
                         <div class="col-md-6">
                             <button type="submit" name="accion" value="vender" class="btn btn-success btn-lg fw-bold py-3 fs-4 shadow w-100">
@@ -98,11 +98,10 @@
         </div>
     </div>
 
-    <!-- Script de búsqueda inteligente y cálculo dinámico -->
     <script>
         const catalogoProductos = [
             {% for p in productos %}
-            { id: "{{ p.id }}", texto: "{{ p.nombre }} - {{ p.color }} [{{ p.categoria }}] (${{ '%.2f'|format(p.precio) }})", precio: {{ p.precio }} },
+            { id: "{{ p.id }}", texto: "{{ p.nombre }} - {{ p.color }} [{{ p.categoria }}] (${{ '%.2f'|format(p.precio|float) }})", precio: {{ p.precio|float }} },
             {% endfor %}
         ];
 
