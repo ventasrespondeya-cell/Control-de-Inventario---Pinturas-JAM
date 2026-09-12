@@ -595,6 +595,11 @@ def reportes():
 def cotizar():
     conn = conectar_db()
     cursor = conn.cursor()
+    
+    cursor.execute("SELECT tasa_bcv FROM configuracion LIMIT 1")
+    res_tasa = cursor.fetchone()
+    tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] else 36.50
+    
     if request.method == 'POST':
         cliente = request.form.get('cliente', 'Cliente Estimado')
         metodo_pago = request.form.get('metodo_pago', 'Efectivo')
@@ -640,12 +645,12 @@ def cotizar():
         if accion == 'vender':
             return redirect(url_for('historial'))
         else:
-            return render_template('cotizacion_imprimir.html', cliente=cliente, items=items, subtotal=subtotal)
+            return render_template('cotizacion_imprimir.html', cliente=cliente, items=items, subtotal=subtotal, tasa_bcv=tasa_bcv)
             
     cursor.execute("SELECT id, nombre, color, precio, categoria FROM productos ORDER BY nombre ASC")
     productos = cursor.fetchall()
     conn.close()
-    return render_template('cotizar.html', productos=productos)
+    return render_template('cotizar.html', productos=productos, tasa_bcv=tasa_bcv)
 
 @app.route('/creditos')
 @login_required
