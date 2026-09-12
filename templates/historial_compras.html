@@ -27,6 +27,7 @@
                                 <th>Costo Unit.</th>
                                 <th>Cantidad</th>
                                 <th>Costo Total</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white">
@@ -39,6 +40,12 @@
                                 <td class="text-center text-danger fw-bold">${{ "%.2f"|format(c.costo_unitario) }}</td>
                                 <td class="text-center fs-5 fw-bold">{{ c.cantidad }}</td>
                                 <td class="text-center text-danger fw-bold fs-5">${{ "%.2f"|format(c.costo_total) }}</td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <a href="/editar_compra/{{ c.id }}" class="btn btn-warning btn-sm fw-bold shadow-sm" title="Editar compra"><i class="fas fa-edit"></i></a>
+                                        <a href="/eliminar_compra/{{ c.id }}" class="btn btn-danger btn-sm fw-bold shadow-sm" title="Eliminar compra" onclick="return confirm('¿Seguro que deseas eliminar esta compra? Se restará la cantidad del stock actual.');"><i class="fas fa-trash-alt"></i></a>
+                                    </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
