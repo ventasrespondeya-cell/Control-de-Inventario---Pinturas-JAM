@@ -36,6 +36,20 @@ def inicializar_db():
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
     
+   # Nueva tabla para los Cierres de Caja Diarios (El Cuaderno de la Sra. Mishell)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cierres_diarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha DATE DEFAULT CURRENT_DATE,
+            tasa_bcv REAL,
+            total_pago_movil_bs REAL,
+            total_punto_bs REAL,
+            total_efectivo_usd REAL,
+            total_usdt REAL,
+            notas TEXT
+        )
+    ''')
+    
     cursor.execute('''CREATE TABLE IF NOT EXISTS historial_ventas (
                         id SERIAL PRIMARY KEY, 
                         producto_nombre TEXT NOT NULL, 
@@ -595,5 +609,59 @@ def historial_credito(cliente_id):
     conn.close()
     return render_template('historial_credito.html', cliente=cliente, movimientos=movimientos)
 
-if __name__ == '__main__':
+from datetime import datetime
+
+@app.route('/cuaderno_cierre', methods=['GET', 'POST'])
+def cuaderno_cierre():
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    # Si la Sra. Mishell le da a "Guardar Cierre"
+    if request.method == 'POST':
+        tasa_bcv = request.form.get('tasa_bcv', 0.0)
+        total_pago_movil_bs = request.form.get('total_pm_bs', 0.0)
+        total_punto_bs = request.form.get('total_punto_bs', 0.0)
+        total_efectivo_usd = request.form.get('total_efectivo_usd', 0.0)
+        total_usdt = request.form.get('total_usdt', 0.0)
+        notas = request.form.get('notas', '')
+        
+        cursor.execute("""
+            INSERT INTO cierres_diarios 
+            (tasa_bcv, total_pago_movil_bs, total_punto_bs, total_efectivo_usd, total_usdt, notas) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (tasa_bcv, total_pago_movil_bs, total_punto_bs, total_efectivo_usd, total_usdt, notas))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('historial'))
+
+    # Si solo está viendo la pantalla (GET) traemos las ventas de HOY
+    cursor.execute("""
+        SELECT cantidad, producto_nombre as descripcion, metodo_pago, total 
+        FROM historial_ventas 
+        WHERE DATE(fecha) = DATE('now', 'localtime')
+    """)
+    ventas_hoy = cursor.fetchall()
+    
+    # Pre-calcular totales en USD para enviarlos a la vista
+    totales_usd = {
+        'Pago Móvil': 0.0,
+        'Punto': 0.0,
+        'Transferencia': 0.0,
+        'Efectivo': 0.0,
+        'USDT': 0.0
+    }
+    
+    for v in ventas_hoy:
+        metodo = v['metodo_pago']
+        if metodo in totales_usd:
+            totales_usd[metodo] += v['total']
+        else:
+            totales_usd['Efectivo'] += v['total'] # Por defecto si no coincide
+            
+    fecha_hoy = datetime.now().strftime("%d-%m-%y")
+    conn.close()
+    
+    return render_template('cuaderno_cierre.html', ventas=ventas_hoy, totales_usd=totales_usd, fecha=fecha_hoy)
+    
+    if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
