@@ -36,8 +36,8 @@ def inicializar_db():
                         stock_actual INTEGER NOT NULL, 
                         stock_minimo INTEGER NOT NULL,
                         categoria TEXT DEFAULT 'Pinturas y Acabados')''')
+    cursor.execute('''ALTER TABLE productos ADD COLUMN IF NOT EXISTS categoria TEXT DEFAULT 'Pinturas y Acabados' ''')
     
-    # Se corrigió a SERIAL para PostgreSQL
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS cierres_diarios (
             id SERIAL PRIMARY KEY,
@@ -76,7 +76,6 @@ def inicializar_db():
                         username TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL)''')
 
-    # TABLAS PARA EL SISTEMA DE CRÉDITOS
     cursor.execute('''CREATE TABLE IF NOT EXISTS clientes_credito (
                         id SERIAL PRIMARY KEY,
                         nombre TEXT UNIQUE NOT NULL,
@@ -91,11 +90,12 @@ def inicializar_db():
                         descripcion TEXT,
                         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
-    # NUEVA TABLA: CONFIGURACIÓN (TASA BCV)
     cursor.execute('''CREATE TABLE IF NOT EXISTS configuracion (
                         id SERIAL PRIMARY KEY,
                         tasa_bcv NUMERIC DEFAULT 36.50,
                         ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tasa_bcv NUMERIC DEFAULT 36.50''')
+    cursor.execute('''ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP''')
     
     cursor.execute("SELECT COUNT(*) as conteo FROM usuarios")
     resultado = cursor.fetchone()
@@ -120,7 +120,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# FUNCIONES AUXILIARES PARA CRÉDITOS
 def registrar_cargo_credito(cursor, comprador, total, descripcion):
     comprador = comprador.strip().upper()
     cursor.execute("SELECT id FROM clientes_credito WHERE nombre = %s", (comprador,))
@@ -198,11 +197,14 @@ def inicio():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # --- OBTENER TASA BCV ---
-    cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
-    res_tasa = cursor.fetchone()
-    tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa else 36.50
-    fecha_act = res_tasa['fecha_act'] if res_tasa else "Desconocida"
+    try:
+        cursor.execute("SELECT tasa_bcv, TO_CHAR(ultima_actualizacion, 'DD/MM/YYYY HH12:MI AM') as fecha_act FROM configuracion LIMIT 1")
+        res_tasa = cursor.fetchone()
+        tasa_bcv = float(res_tasa['tasa_bcv']) if res_tasa and res_tasa['tasa_bcv'] else 36.50
+        fecha_act = res_tasa['fecha_act'] if res_tasa and res_tasa['fecha_act'] else "Desconocida"
+    except Exception:
+        tasa_bcv = 36.50
+        fecha_act = "Desconocida"
 
     if busqueda:
         cursor.execute("SELECT * FROM productos WHERE nombre ILIKE %s OR color ILIKE %s OR categoria ILIKE %s ORDER BY id ASC", (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
@@ -225,12 +227,11 @@ def inicio():
     
     cursor.execute("SELECT SUM(precio * stock_actual) as total FROM productos")
     resultado_total = cursor.fetchone()
-    valor_total = resultado_total['total'] if resultado_total and resultado_total['total'] else 0.0
+    valor_total = float(resultado_total['total']) if resultado_total and resultado_total['total'] else 0.0
     
     conn.close()
     return render_template('index.html', productos=productos, categorias=categorias, productos_agrupados=productos_agrupados, busqueda=busqueda, valor_total=valor_total, tasa_bcv=tasa_bcv, fecha_act=fecha_act)
 
-# --- NUEVA RUTA: ACTUALIZAR TASA ---
 @app.route('/actualizar_tasa', methods=['POST'])
 @login_required
 def actualizar_tasa():
@@ -304,6 +305,71 @@ def comprar():
     conn.close()
     return render_template('comprar.html', productos=productos)
 
+@app.route('/editar_compra/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_compra(id):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        proveedor = request.form['proveedor']
+        costo_unitario = float(request.form['costo_unitario'])
+        nueva_cantidad = int(request.form['cantidad'])
+        costo_total = costo_unitario * nueva_cantidad
+        
+        cursor.execute("SELECT * FROM historial_compras WHERE id = %s", (id,))
+        compra_vieja = cursor.fetchone()
+        
+        if compra_vieja:
+            p_id = compra_vieja['producto_id']
+            vieja_cantidad = compra_vieja['cantidad']
+            dif_stock = nueva_cantidad - vieja_cantidad
+            
+            cursor.execute("SELECT stock_actual FROM productos WHERE id = %s", (p_id,))
+            prod = cursor.fetchone()
+            if prod:
+                nuevo_stock = prod['stock_actual'] + dif_stock
+                cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, p_id))
+            
+            cursor.execute("""UPDATE historial_compras 
+                              SET proveedor = %s, costo_unitario = %s, cantidad = %s, costo_total = %s 
+                              WHERE id = %s""", 
+                           (proveedor, costo_unitario, nueva_cantidad, costo_total, id))
+            conn.commit()
+            
+        conn.close()
+        return redirect(url_for('historial_compras'))
+        
+    cursor.execute("SELECT * FROM historial_compras WHERE id = %s", (id,))
+    compra = cursor.fetchone()
+    conn.close()
+    return render_template('editar_compra.html', compra=compra)
+
+@app.route('/eliminar_compra/<int:id>')
+@login_required
+def eliminar_compra(id):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM historial_compras WHERE id = %s", (id,))
+    compra = cursor.fetchone()
+    
+    if compra:
+        p_id = compra['producto_id']
+        cantidad = compra['cantidad']
+        
+        cursor.execute("SELECT stock_actual FROM productos WHERE id = %s", (p_id,))
+        prod = cursor.fetchone()
+        if prod:
+            nuevo_stock = prod['stock_actual'] - cantidad
+            cursor.execute("UPDATE productos SET stock_actual = %s WHERE id = %s", (nuevo_stock, p_id))
+            
+        cursor.execute("DELETE FROM historial_compras WHERE id = %s", (id,))
+        conn.commit()
+        
+    conn.close()
+    return redirect(url_for('historial_compras'))
+
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar(id):
@@ -358,7 +424,6 @@ def vender(id):
             cursor.execute("""INSERT INTO historial_ventas (producto_nombre, precio, comprador, metodo_pago, cantidad, total) VALUES (%s, %s, %s, %s, %s, %s)""", 
                            (nombre_prod_completo, prod['precio'], comprador, metodo_pago, cantidad, total))
             
-            # Lógica de crédito
             if metodo_pago.lower() in ['crédito', 'credito', 'fiado']:
                 registrar_cargo_credito(cursor, comprador, total, f"Compra de {cantidad}x {nombre_prod_completo}")
                 
@@ -566,7 +631,6 @@ def cotizar():
                                               VALUES (%s, %s, %s, %s, %s, %s)""", 
                                            (nombre_prod_completo, prod['precio'], cliente, metodo_pago, cant, total_item))
         
-        # Lógica de crédito para compra múltiple
         if accion == 'vender' and metodo_pago.lower() in ['crédito', 'credito', 'fiado']:
             registrar_cargo_credito(cursor, cliente, subtotal, "Compra múltiple (Ver historial de ventas)")
             
@@ -582,8 +646,6 @@ def cotizar():
     productos = cursor.fetchall()
     conn.close()
     return render_template('cotizar.html', productos=productos)
-
-# RUTAS PARA CREDITOS 
 
 @app.route('/creditos')
 @login_required
@@ -635,7 +697,6 @@ def historial_credito(cliente_id):
     conn.close()
     return render_template('historial_credito.html', cliente=cliente, movimientos=movimientos)
 
-
 @app.route('/cuaderno_cierre', methods=['GET', 'POST'])
 def cuaderno_cierre():
     conn = conectar_db()
@@ -649,7 +710,6 @@ def cuaderno_cierre():
         total_usdt = request.form.get('total_usdt', 0.0)
         notas = request.form.get('notas', '')
         
-        # Corregido de ? (SQLite) a %s (PostgreSQL)
         cursor.execute("""
             INSERT INTO cierres_diarios 
             (tasa_bcv, total_pago_movil_bs, total_punto_bs, total_efectivo_usd, total_usdt, notas) 
@@ -659,7 +719,6 @@ def cuaderno_cierre():
         conn.close()
         return redirect(url_for('historial'))
 
-    # Corregido DATE('now', 'localtime') a CURRENT_DATE en PostgreSQL
     cursor.execute("""
         SELECT cantidad, producto_nombre as descripcion, metodo_pago, total 
         FROM historial_ventas 
