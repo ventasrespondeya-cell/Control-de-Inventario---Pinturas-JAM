@@ -118,9 +118,9 @@
                                     <tr class="{% if p.stock_actual <= p.stock_minimo %}table-warning{% endif %}">
                                         <td class="fs-5 fw-bold text-dark">{{ p.nombre }}</td>
                                         <td class="fs-5 fw-bold text-secondary">{{ p.color }}</td>
-                                        <td class="fs-4 fw-bold text-success">${{ "%.2f"|format(p.precio) }}</td>
-                                        <!-- NUEVO: PRECIO EN BOLÍVARES -->
-                                        <td class="fs-5 fw-bold text-success">Bs. {{ "%.2f"|format(p.precio * tasa_bcv) }}</td>
+                                        <td class="fs-4 fw-bold text-success">${{ "%.2f"|format(p.precio|float) }}</td>
+                                        <!-- NUEVO: PRECIO EN BOLÍVARES CORREGIDO -->
+                                        <td class="fs-5 fw-bold text-success">Bs. {{ "%.2f"|format(p.precio|float * tasa_bcv) }}</td>
                                         <td class="text-center fs-5 fw-bold">
                                             {{ p.stock_actual }}
                                             {% if p.stock_actual <= p.stock_minimo %}
